@@ -1,0 +1,6 @@
+lerobot/
+*.pyc
+__pycache__/
+discovered_files.json
+*.egg-info/
+.env
