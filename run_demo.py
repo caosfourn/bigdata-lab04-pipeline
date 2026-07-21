@@ -3,14 +3,17 @@ Script tạo ra output thực tế của Task 1 & Task 2.
 Kết quả được dùng để điền vào notebook (nếu Jupyter chưa cài).
 """
 import sys, os, json
+from pathlib import Path
 
-os.chdir('d:\\HuynhHan\\Bigdata\\bigdata-lab04-pipeline')
-sys.path.insert(0, 'src')
+REPO_ROOT = Path(__file__).resolve().parent
+os.chdir(REPO_ROOT)
+sys.path.insert(0, str(REPO_ROOT / 'src'))
 
 from discovery import discover_python_files, EXCLUDE_DIRS, EXCLUDE_FILES
 from parser_service import CPGParser
 
-REPO_ROOT = os.path.abspath('lerobot')
+SAMPLE_REPO = REPO_ROOT / 'lerobot'
+REPO_ROOT = SAMPLE_REPO.resolve()
 
 # ─── TASK 1 ───────────────────────────────────────────────────────────────────
 print("=" * 65)

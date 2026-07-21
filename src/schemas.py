@@ -31,7 +31,7 @@ SCHEMA_VERSION = "1.0"
 
 def _now_iso() -> str:
     """Trả về timestamp UTC hiện tại theo định dạng ISO 8601."""
-    return datetime.datetime.utcnow().isoformat() + "Z"
+    return datetime.datetime.now(datetime.UTC).isoformat().replace("+00:00", "Z")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
