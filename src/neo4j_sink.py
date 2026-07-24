@@ -7,7 +7,6 @@ def build_constraint_statements() -> list[str]:
     """Return Neo4j constraint statements for idempotent loading."""
     return [
         "CREATE CONSTRAINT node_id_unique IF NOT EXISTS FOR (n:CodeNode) REQUIRE n.node_id IS UNIQUE;",
-        "CREATE CONSTRAINT edge_id_unique IF NOT EXISTS FOR (e:CodeEdge) REQUIRE e.edge_id IS UNIQUE;",
         "CREATE CONSTRAINT metadata_file_unique IF NOT EXISTS FOR (m:CodeFile) REQUIRE m.file_path IS UNIQUE;",
     ]
 
@@ -15,12 +14,14 @@ def build_constraint_statements() -> list[str]:
 def build_node_merge_cypher(event: dict) -> str:
     """Build a MERGE-based Cypher statement for a node event."""
     props = event.get("properties", {})
-    label = event.get("label", "AST_Node")
     node_id = event.get("node_id", "")
     file_path = event.get("file_path", "")
+    # The event label is stored as data. Using it directly in Cypher would allow
+    # malformed input to inject a label into the query.
     props_payload = {
         "node_id": node_id,
         "file_path": file_path,
+        "ast_label": event.get("label", "AST_Node"),
         "type": props.get("type"),
         "line_number": props.get("line_number"),
         "col_offset": props.get("col_offset"),
@@ -33,7 +34,7 @@ def build_node_merge_cypher(event: dict) -> str:
     }
     payload = ", ".join(f"{k}: ${k}" for k in props_payload)
     return (
-        f"MERGE (n:{label} {{node_id: $node_id}}) "
+        "MERGE (n:CodeNode {node_id: $node_id}) "
         f"SET n += {{{payload}}};"
     )
 
@@ -55,7 +56,9 @@ def build_edge_merge_cypher(event: dict) -> str:
     }
     payload = ", ".join(f"{k}: ${k}" for k in props_payload)
     return (
-        f"MERGE (e:CodeEdge {{edge_id: $edge_id}}) "
+        "MERGE (source:CodeNode {node_id: $source_id}) "
+        "MERGE (target:CodeNode {node_id: $target_id}) "
+        "MERGE (source)-[e:CPG_EDGE {edge_id: $edge_id}]->(target) "
         f"SET e += {{{payload}}};"
     )
 

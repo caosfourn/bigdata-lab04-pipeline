@@ -54,6 +54,28 @@ jupyter notebook notebooks/task1_task2_member1.ipynb
 pip install -r requirements.txt   # Chỉ cần nếu chạy Kafka / Spark / Notebook
 ```
 
+## Quick start end-to-end
+
+```powershell
+Copy-Item .env.example .env
+docker compose up -d --build
+.\scripts\create_topics.ps1
+.\scripts\register_neo4j_connector.ps1
+python -m src.kafka_producer lerobot --brokers localhost:9092
+```
+
+Giao diện local:
+
+- Kafka UI: `http://localhost:8080`
+- Neo4j Browser: `http://localhost:7474`
+- Kafka Connect API: `http://localhost:8083`
+
+Trên Windows console cũ, bật UTF-8 trước khi chạy demo:
+
+```powershell
+$env:PYTHONUTF8 = "1"
+```
+
 ## Kafka Topic Layout (được Thành viên 2 sử dụng)
 
 | Topic | Nội dung | Producer | Consumer |
@@ -149,9 +171,9 @@ spark-submit `
 | `MONGO_URI` | URI MongoDB Spark truy cập được | `mongodb://localhost:27017` |
 | `CHECKPOINT_DIR` | Checkpoint riêng, bền vững cho query | `/tmp/cpg-metadata-checkpoint` |
 
-Job tạo `_id = SHA-256(file_path + ":" + file_hash)` và ghi bằng MongoDB
-`replace/upsert`. Replay cùng phiên bản file vì vậy cập nhật document đã có thay vì insert
-document mới.
+Job tạo `_id = SHA-256(file_path)` và ghi bằng MongoDB `replace/upsert`. Khi nội
+dung file thay đổi, `file_hash` và các số đếm được cập nhật trên đúng một document
+hiện hành của file thay vì tạo thêm document.
 
 Không dùng chung `CHECKPOINT_DIR` với query khác, không xóa hoặc đổi đường dẫn khi restart.
 `startingOffsets` chỉ áp dụng khi checkpoint chưa tồn tại; sau đó Spark luôn tiếp tục từ

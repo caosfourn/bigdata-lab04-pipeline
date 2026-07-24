@@ -1,10 +1,13 @@
 import hashlib
 import json
+import os
 from pathlib import Path
 import sys
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+os.environ.setdefault("PYSPARK_PYTHON", sys.executable)
+os.environ.setdefault("PYSPARK_DRIVER_PYTHON", sys.executable)
 
 try:
     from pyspark.sql import SparkSession
@@ -56,7 +59,7 @@ class Person3SparkTests(unittest.TestCase):
 
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["file_path"], "src/app.py")
-        expected_id = hashlib.sha256(b"src/app.py:abc").hexdigest()
+        expected_id = hashlib.sha256(b"src/app.py").hexdigest()
         self.assertEqual(rows[0]["_id"], expected_id)
 
 

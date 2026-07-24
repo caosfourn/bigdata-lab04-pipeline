@@ -5,6 +5,11 @@ Kết quả được dùng để điền vào notebook (nếu Jupyter chưa cài
 import sys, os, json
 from pathlib import Path
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 REPO_ROOT = Path(__file__).resolve().parent
 os.chdir(REPO_ROOT)
 sys.path.insert(0, str(REPO_ROOT / 'src'))

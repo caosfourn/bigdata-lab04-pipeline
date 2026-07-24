@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, concat_ws, from_json, sha2
+from pyspark.sql.functions import col, from_json, sha2
 from pyspark.sql.types import DoubleType, LongType, StringType, StructField, StructType
 
 try:
@@ -62,7 +62,9 @@ def transform_metadata(kafka_df, metadata_schema: StructType, topic: str):
             & col("parser_version").isNotNull()
             & col("parse_duration_ms").isNotNull()
         )
-        .withColumn("_id", sha2(concat_ws(":", col("file_path"), col("file_hash")), 256))
+        # One current metadata document per source file. A changed file replaces
+        # the previous document instead of creating a second version.
+        .withColumn("_id", sha2(col("file_path"), 256))
     )
 
 

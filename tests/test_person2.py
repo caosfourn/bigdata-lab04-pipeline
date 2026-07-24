@@ -91,6 +91,9 @@ class Person2ContractTests(unittest.TestCase):
         )
         self.assertIn("MERGE", edge_cypher)
         self.assertIn("edge_id", edge_cypher)
+        self.assertIn("CPG_EDGE", edge_cypher)
+        self.assertIn("source:CodeNode", edge_cypher)
+        self.assertIn("target:CodeNode", edge_cypher)
 
         metadata_cypher = build_metadata_merge_cypher(
             {

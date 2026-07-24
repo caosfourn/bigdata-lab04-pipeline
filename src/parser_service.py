@@ -17,6 +17,8 @@ Ghi chú về thư viện:
   Thích hợp cho môi trường hạn chế, đủ để trích xuất AST/CFG/DFG/CALL.
 """
 
+from __future__ import annotations
+
 import ast
 import hashlib
 import os
@@ -24,12 +26,20 @@ import time
 import datetime
 from typing import Generator
 
-from schemas import (
-    make_node_event,
-    make_edge_event,
-    make_metadata_event,
-    make_error_event,
-)
+try:
+    from .schemas import (
+        make_node_event,
+        make_edge_event,
+        make_metadata_event,
+        make_error_event,
+    )
+except ImportError:  # Support: python src/parser_service.py ...
+    from schemas import (
+        make_node_event,
+        make_edge_event,
+        make_metadata_event,
+        make_error_event,
+    )
 
 SCHEMA_VERSION = "1.0"
 
@@ -577,6 +587,8 @@ class CPGParser:
 if __name__ == "__main__":
     import sys
     import json
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
     if len(sys.argv) < 3:
         print("Usage: python parser_service.py <absolute_file_path> <repo_root>")

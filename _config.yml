@@ -1,0 +1,18 @@
+title: "Lab 04 — Incremental CPG Streaming Pipeline"
+author: "Big Data Lab Team"
+copyright: "2026"
+only_build_toc_files: true
+execute:
+  execute_notebooks: "off"
+  timeout: 180
+parse:
+  myst_enable_extensions:
+    - colon_fence
+    - deflist
+    - dollarmath
+repository:
+  url: "https://github.com/REPLACE-WITH-TEAM/REPLACE-WITH-REPOSITORY"
+  branch: main
+html:
+  use_repository_button: true
+  use_issues_button: true

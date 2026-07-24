@@ -1,0 +1,22 @@
+{
+  "name": "neo4j-cpg-sink",
+  "config": {
+    "connector.class": "org.neo4j.connectors.kafka.sink.Neo4jConnector",
+    "tasks.max": "1",
+    "topics": "cpg.nodes,cpg.edges",
+    "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter.schemas.enable": "false",
+    "neo4j.uri": "bolt://neo4j:7687",
+    "neo4j.database": "neo4j",
+    "neo4j.authentication.type": "BASIC",
+    "neo4j.authentication.basic.username": "neo4j",
+    "neo4j.authentication.basic.password": "cpg-password",
+    "neo4j.cypher.topic.cpg.nodes": "MERGE (n:CodeNode {node_id: __value.node_id}) SET n.file_path = __value.file_path, n.ast_label = __value.label, n.type = __value.properties.type, n.line_number = __value.properties.line_number, n.col_offset = __value.properties.col_offset, n.end_lineno = __value.properties.end_lineno, n.end_col_offset = __value.properties.end_col_offset, n.name = __value.properties.name, n.scope = __value.properties.scope, n.code_snippet = __value.properties.code_snippet, n.event_time = __value.event_time",
+    "neo4j.cypher.topic.cpg.edges": "MERGE (source:CodeNode {node_id: __value.source_id}) MERGE (target:CodeNode {node_id: __value.target_id}) MERGE (source)-[edge:CPG_EDGE {edge_id: __value.edge_id}]->(target) SET edge.type = __value.type, edge.file_path = __value.file_path, edge.event_time = __value.event_time, edge.child_type = __value.properties.child_type, edge.sequence = __value.properties.sequence, edge.variable_name = __value.properties.variable_name, edge.callee_name = __value.properties.callee_name, edge.call_site_line = __value.properties.call_site_line, edge.is_external = __value.properties.is_external",
+    "errors.tolerance": "all",
+    "errors.deadletterqueue.topic.name": "cpg.errors",
+    "errors.deadletterqueue.topic.replication.factor": "1",
+    "errors.deadletterqueue.context.headers.enable": "true"
+  }
+}
