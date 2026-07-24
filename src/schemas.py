@@ -30,8 +30,8 @@ SCHEMA_VERSION = "1.0"
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _now_iso() -> str:
-    """Trả về timestamp UTC hiện tại theo định dạng ISO 8601."""
-    return datetime.datetime.utcnow().isoformat() + "Z"
+    """Trả về timestamp ISO 8601 có timezone, luôn ở UTC."""
+    return datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -50,6 +50,10 @@ def make_node_event(
     name: str | None = None,
     code_snippet: str | None = None,
     scope: str | None = None,
+    repo_id: str = "",
+    file_id: str = "",
+    file_hash: str = "",
+    parse_status: str = "success",
 ) -> dict:
     """
     Tạo một node event hoàn chỉnh để produce lên topic cpg.nodes.
@@ -71,7 +75,11 @@ def make_node_event(
         "schema_version": SCHEMA_VERSION,
         "event_time":     _now_iso(),
         "topic":          TOPIC_NODES,
+        "repo_id":        repo_id,
+        "file_id":        file_id,
         "file_path":      file_path,
+        "file_hash":      file_hash,
+        "parse_status":   parse_status,
         "node_id":        node_id,
         "label":          label,
         "properties": {
@@ -94,6 +102,10 @@ def make_edge_event(
     source_id: str,
     target_id: str,
     properties: dict | None = None,
+    repo_id: str = "",
+    file_id: str = "",
+    file_hash: str = "",
+    parse_status: str = "success",
 ) -> dict:
     """
     Tạo một edge event hoàn chỉnh để produce lên topic cpg.edges.
@@ -110,7 +122,11 @@ def make_edge_event(
         "schema_version": SCHEMA_VERSION,
         "event_time":     _now_iso(),
         "topic":          TOPIC_EDGES,
+        "repo_id":        repo_id,
+        "file_id":        file_id,
         "file_path":      file_path,
+        "file_hash":      file_hash,
+        "parse_status":   parse_status,
         "edge_id":        edge_id,
         "type":           edge_type,
         "source_id":      source_id,
@@ -130,6 +146,9 @@ def make_metadata_event(
     total_call_edges: int,
     parser_version: str = "ast-stdlib",
     parse_duration_ms: float = 0.0,
+    repo_id: str = "",
+    file_id: str = "",
+    parse_status: str = "success",
 ) -> dict:
     """
     Tạo một metadata event hoàn chỉnh để produce lên topic cpg.metadata.
@@ -151,9 +170,12 @@ def make_metadata_event(
         "schema_version":    SCHEMA_VERSION,
         "event_time":        _now_iso(),
         "topic":             TOPIC_METADATA,
+        "repo_id":           repo_id,
+        "file_id":           file_id,
         "file_path":         file_path,
         "file_size_bytes":   file_size_bytes,
         "file_hash":         file_hash,
+        "parse_status":      parse_status,
         "total_nodes":       total_nodes,
         "total_edges": {
             "ast":  total_ast_edges,
@@ -172,6 +194,10 @@ def make_error_event(
     error_message: str,
     line_number: int | None = None,
     col_offset: int | None = None,
+    repo_id: str = "",
+    file_id: str = "",
+    file_hash: str = "",
+    parse_status: str = "error",
 ) -> dict:
     """
     Tạo một error event để produce lên topic cpg.errors.
@@ -188,7 +214,11 @@ def make_error_event(
         "schema_version": SCHEMA_VERSION,
         "event_time":     _now_iso(),
         "topic":          TOPIC_ERRORS,
+        "repo_id":        repo_id,
+        "file_id":        file_id,
         "file_path":      file_path,
+        "file_hash":      file_hash,
+        "parse_status":   parse_status,
         "error_type":     error_type,
         "error_message":  error_message,
         "line_number":    line_number,

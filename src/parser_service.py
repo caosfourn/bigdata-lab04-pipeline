@@ -20,16 +20,25 @@ Ghi chú về thư viện:
 import ast
 import hashlib
 import os
+import posixpath
 import time
-import datetime
+from dataclasses import dataclass
 from typing import Generator
 
-from schemas import (
-    make_node_event,
-    make_edge_event,
-    make_metadata_event,
-    make_error_event,
-)
+try:  # `python -m src.parser_service`
+    from .schemas import (
+        make_node_event,
+        make_edge_event,
+        make_metadata_event,
+        make_error_event,
+    )
+except ImportError:  # `python src/parser_service.py`
+    from schemas import (  # type: ignore[no-redef]
+        make_node_event,
+        make_edge_event,
+        make_metadata_event,
+        make_error_event,
+    )
 
 SCHEMA_VERSION = "1.0"
 
@@ -38,56 +47,173 @@ SCHEMA_VERSION = "1.0"
 # STABLE ID GENERATION
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _stable_node_id(relative_path: str, node: ast.AST) -> str:
+def _normalize_relative_path(relative_path: str) -> str:
+    """Chuẩn hoá path thành POSIX form để ID giống nhau trên mọi OS."""
+    normalized = posixpath.normpath(relative_path.replace("\\", "/"))
+    if normalized.startswith("./"):
+        normalized = normalized[2:]
+    return normalized
+
+
+def _stable_file_id(repo_id: str, relative_path: str) -> str:
+    """ID bền vững của file; không phụ thuộc nội dung file."""
+    normalized_path = _normalize_relative_path(relative_path)
+    raw = f"repo={repo_id}\x1fpath={normalized_path}"
+    return "file_" + hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _stable_node_id(
+    relative_path: str,
+    node: ast.AST,
+    structural_path: str | None = None,
+    *,
+    repo_id: str = "",
+    file_id: str | None = None,
+) -> str:
     """
     Tạo Stable ID xác định (deterministic) cho một AST node.
 
     QUAN TRỌNG: ID phải giống nhau mọi lần parse cùng file (nếu code không đổi).
     Vì vậy KHÔNG dùng id(node) — đó là memory address, thay đổi mỗi lần chạy.
 
-    Chiến lược: Hash SHA-256 của (file_path, node_type, lineno, col_offset).
-    Dùng 16 ký tự hex đầu tiên để giữ ID ngắn gọn nhưng vẫn đủ unique.
+    Structural path (ví dụ ``root.body[0].value``) phân biệt được cả
+    những AST singleton không có line/column như ``Load`` hay ``Add``.
+    Toàn bộ 256 bit hash được giữ lại để tránh cắt ngắn không cần thiết.
+
+    ``structural_path=None`` chỉ là fallback tương thích cho code cũ gọi
+    helper này trực tiếp. Parser luôn truyền structural path thực.
     """
-    line = getattr(node, "lineno",     0)
-    col  = getattr(node, "col_offset", 0)
+    normalized_path = _normalize_relative_path(relative_path)
+    resolved_file_id = file_id or _stable_file_id(repo_id, normalized_path)
     node_type = node.__class__.__name__
-    raw = f"{relative_path}::{node_type}@L{line}C{col}"
-    return "node_" + hashlib.sha256(raw.encode()).hexdigest()[:16]
+    if structural_path is None:
+        line = getattr(node, "lineno", 0)
+        col = getattr(node, "col_offset", 0)
+        structural_path = f"legacy@L{line}C{col}"
+    raw = (
+        f"repo={repo_id}\x1ffile={resolved_file_id}\x1fpath={normalized_path}"
+        f"\x1fast_path={structural_path}\x1ftype={node_type}"
+    )
+    return "node_" + hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
-def _stable_edge_id(relative_path: str, edge_type: str, src_id: str, tgt_id: str) -> str:
+def _stable_edge_id(
+    relative_path: str,
+    edge_type: str,
+    src_id: str,
+    tgt_id: str,
+    *,
+    repo_id: str = "",
+    file_id: str | None = None,
+    discriminator: str = "",
+) -> str:
     """
     Tạo Stable ID xác định cho một edge.
     Đảm bảo cùng cặp (src, tgt, type) → cùng ID → Neo4j MERGE không tạo duplicate.
     """
-    raw = f"{relative_path}::{edge_type}::{src_id}::{tgt_id}"
-    return "edge_" + hashlib.sha256(raw.encode()).hexdigest()[:16]
+    normalized_path = _normalize_relative_path(relative_path)
+    resolved_file_id = file_id or _stable_file_id(repo_id, normalized_path)
+    raw = (
+        f"repo={repo_id}\x1ffile={resolved_file_id}\x1fpath={normalized_path}"
+        f"\x1ftype={edge_type}\x1fsource={src_id}\x1ftarget={tgt_id}"
+        f"\x1foccurrence={discriminator}"
+    )
+    return "edge_" + hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # AST VISITOR — thu thập tất cả node IDs trong 1 lần duyệt O(n)
 # ─────────────────────────────────────────────────────────────────────────────
 
-class _NodeIDCollector(ast.NodeVisitor):
+@dataclass(frozen=True)
+class _ASTOccurrence:
+    """Một occurrence trong AST; cùng object singleton có thể có nhiều path."""
+
+    node: ast.AST
+    structural_path: str
+    parent_path: str | None
+    scope: str | None
+
+
+class _NodeIDCollector:
     """
     Bước 1: Duyệt cây AST một lần để xây dựng mapping ast_node → node_id.
     Kết quả này được tái sử dụng bởi các bước trích xuất edge (CFG/DFG/CALL)
     mà không cần parse lại hay tính lại hash.
     """
 
-    def __init__(self, relative_path: str):
-        self.relative_path = relative_path
-        # Dùng id() Python làm key temporary (chỉ trong phạm vi 1 lần parse)
-        self._id_map: dict[int, str] = {}
+    def __init__(self, relative_path: str, repo_id: str = "", file_id: str | None = None):
+        self.relative_path = _normalize_relative_path(relative_path)
+        self.repo_id = repo_id
+        self.file_id = file_id or _stable_file_id(repo_id, self.relative_path)
+        self.occurrences: list[_ASTOccurrence] = []
+        self._path_id_map: dict[str, str] = {}
+        self._paths_by_object: dict[int, list[str]] = {}
 
-    def generic_visit(self, node: ast.AST):
-        nid = _stable_node_id(self.relative_path, node)
-        self._id_map[id(node)] = nid
-        super().generic_visit(node)
+    def visit(self, node: ast.AST):
+        """Thu thập theo field/index path thay vì memory identity của AST object."""
+        self.occurrences.clear()
+        self._path_id_map.clear()
+        self._paths_by_object.clear()
+        self._collect(node, "root", parent_path=None, enclosing_scope=None)
+        return node
 
-    def get_id(self, node: ast.AST) -> str:
+    def _collect(
+        self,
+        node: ast.AST,
+        structural_path: str,
+        parent_path: str | None,
+        enclosing_scope: str | None,
+    ) -> None:
+        occurrence = _ASTOccurrence(
+            node=node,
+            structural_path=structural_path,
+            parent_path=parent_path,
+            scope=enclosing_scope,
+        )
+        self.occurrences.append(occurrence)
+        self._path_id_map[structural_path] = _stable_node_id(
+            self.relative_path,
+            node,
+            structural_path,
+            repo_id=self.repo_id,
+            file_id=self.file_id,
+        )
+        self._paths_by_object.setdefault(id(node), []).append(structural_path)
+
+        child_scope = enclosing_scope
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            child_scope = node.name
+
+        for field_name, value in ast.iter_fields(node):
+            if isinstance(value, ast.AST):
+                child_path = f"{structural_path}.{field_name}"
+                self._collect(value, child_path, structural_path, child_scope)
+            elif isinstance(value, list):
+                for index, item in enumerate(value):
+                    if isinstance(item, ast.AST):
+                        child_path = f"{structural_path}.{field_name}[{index}]"
+                        self._collect(item, child_path, structural_path, child_scope)
+
+    def get_id(self, node: ast.AST, structural_path: str | None = None) -> str:
         """Tra cứu stable ID của node (đã được tính ở bước đầu)."""
-        return self._id_map.get(id(node), _stable_node_id(self.relative_path, node))
+        if structural_path is not None:
+            return self._path_id_map[structural_path]
+        paths = self._paths_by_object.get(id(node), [])
+        if paths:
+            # Semantic nodes (Name/Call/stmt/definition) have exactly one path.
+            # Singleton operator/context nodes are consumed through occurrences.
+            return self._path_id_map[paths[0]]
+        return _stable_node_id(
+            self.relative_path,
+            node,
+            repo_id=self.repo_id,
+            file_id=self.file_id,
+        )
+
+    def get_id_by_path(self, structural_path: str) -> str:
+        """Tra cứu ID chính xác của một AST occurrence."""
+        return self._path_id_map[structural_path]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -154,17 +280,27 @@ class CPGParser:
     notebook và testing dùng dễ hơn.
     """
 
-    def __init__(self, absolute_path: str, repo_root: str):
+    def __init__(self, absolute_path: str, repo_root: str, repo_id: str | None = None):
         """
         Args:
             absolute_path: Đường dẫn tuyệt đối đến file .py cần parse.
             repo_root    : Đường dẫn tuyệt đối đến thư mục gốc của repo đã clone.
                            Dùng để tính relative_path chuẩn hóa trong mọi event.
+            repo_id      : ID logic cố định của repository. Nên truyền rõ (ví dụ
+                           ``huggingface/lerobot``) khi nhiều máy clone repo vào
+                           các tên thư mục khác nhau. Mặc định là basename repo.
         """
-        self.absolute_path = absolute_path
-        self.repo_root     = os.path.abspath(repo_root)
+        self.absolute_path = os.path.abspath(absolute_path)
+        self.repo_root = os.path.abspath(repo_root)
+        self.repo_id = repo_id if repo_id is not None else (
+            os.path.basename(os.path.normpath(self.repo_root)) or "repository"
+        )
         # relative_path là key chính trong mọi event — chuẩn hóa bằng forward slash
-        self.relative_path = os.path.relpath(absolute_path, self.repo_root).replace("\\", "/")
+        self.relative_path = _normalize_relative_path(
+            os.path.relpath(self.absolute_path, self.repo_root)
+        )
+        self.file_id = _stable_file_id(self.repo_id, self.relative_path)
+        self.file_hash = ""
 
     # ── PUBLIC API ────────────────────────────────────────────────────────────
 
@@ -179,18 +315,34 @@ class CPGParser:
             error_event: Error event (cho cpg.errors topic) hoặc None nếu không có lỗi.
         """
         t_start = time.time()
+        # Parser instance có thể được reuse sau khi file thay đổi/bị xoá.
+        self.file_hash = ""
 
-        # Đọc file
+        # Đọc bytes một lần để hash khớp chính xác với payload được parse.
         try:
-            with open(self.absolute_path, "r", encoding="utf-8") as f:
-                source_code = f.read()
-        except (OSError, UnicodeDecodeError) as e:
+            with open(self.absolute_path, "rb") as f:
+                source_bytes = f.read()
+        except OSError as e:
             err = make_error_event(
                 file_path=self.relative_path,
                 error_type=type(e).__name__,
                 error_message=str(e),
+                **self._event_context(parse_status="error"),
             )
-            meta = self._empty_metadata(t_start)
+            meta = self._empty_metadata(t_start, parse_status="error")
+            return [], [], meta, err
+
+        self.file_hash = hashlib.sha256(source_bytes).hexdigest()
+        try:
+            source_code = source_bytes.decode("utf-8")
+        except UnicodeDecodeError as e:
+            err = make_error_event(
+                file_path=self.relative_path,
+                error_type=type(e).__name__,
+                error_message=str(e),
+                **self._event_context(parse_status="error"),
+            )
+            meta = self._empty_metadata(t_start, parse_status="error")
             return [], [], meta, err
 
         # Parse AST
@@ -203,13 +355,18 @@ class CPGParser:
                 error_message=str(e.msg),
                 line_number=e.lineno,
                 col_offset=e.offset,
+                **self._event_context(parse_status="error"),
             )
-            meta = self._empty_metadata(t_start)
+            meta = self._empty_metadata(t_start, parse_status="error")
             return [], [], meta, err
 
         # Xây dựng cấu trúc hỗ trợ: parent map và ID map
         parent_map   = self._build_parent_map(tree)
-        id_collector = _NodeIDCollector(self.relative_path)
+        id_collector = _NodeIDCollector(
+            self.relative_path,
+            repo_id=self.repo_id,
+            file_id=self.file_id,
+        )
         id_collector.visit(tree)
 
         # Trích xuất 4 thành phần CPG
@@ -220,14 +377,12 @@ class CPGParser:
         call_edges  = list(self._extract_call_edges(tree, id_collector))
         edge_events = ast_edges + cfg_edges + dfg_edges + call_edges
 
-        # Tính file hash để phục vụ idempotency (Task 6)
-        file_hash = self._compute_file_hash()
         duration_ms = (time.time() - t_start) * 1000
 
         metadata = make_metadata_event(
             file_path=self.relative_path,
-            file_size_bytes=os.path.getsize(self.absolute_path),
-            file_hash=file_hash,
+            file_size_bytes=len(source_bytes),
+            file_hash=self.file_hash,
             total_nodes=len(node_events),
             total_ast_edges=len(ast_edges),
             total_cfg_edges=len(cfg_edges),
@@ -235,6 +390,9 @@ class CPGParser:
             total_call_edges=len(call_edges),
             parser_version="ast-stdlib-3.x",
             parse_duration_ms=round(duration_ms, 2),
+            repo_id=self.repo_id,
+            file_id=self.file_id,
+            parse_status="success",
         )
 
         return node_events, edge_events, metadata, None
@@ -257,7 +415,34 @@ class CPGParser:
                 hasher.update(chunk)
         return hasher.hexdigest()
 
-    def _empty_metadata(self, t_start: float) -> dict:
+    def _event_context(self, parse_status: str = "success") -> dict:
+        """Các field bắt buộc dùng chung cho node/edge/error events."""
+        return {
+            "repo_id": self.repo_id,
+            "file_id": self.file_id,
+            "file_hash": self.file_hash,
+            "parse_status": parse_status,
+        }
+
+    def _edge_id(
+        self,
+        edge_type: str,
+        source_id: str,
+        target_id: str,
+        discriminator: str = "",
+    ) -> str:
+        """Tạo edge ID với repo/file context của parser hiện tại."""
+        return _stable_edge_id(
+            self.relative_path,
+            edge_type,
+            source_id,
+            target_id,
+            repo_id=self.repo_id,
+            file_id=self.file_id,
+            discriminator=discriminator,
+        )
+
+    def _empty_metadata(self, t_start: float, parse_status: str = "error") -> dict:
         """Metadata rỗng dùng khi parse thất bại."""
         duration_ms = (time.time() - t_start) * 1000
         size = 0
@@ -268,13 +453,16 @@ class CPGParser:
         return make_metadata_event(
             file_path=self.relative_path,
             file_size_bytes=size,
-            file_hash="",
+            file_hash=self.file_hash,
             total_nodes=0,
             total_ast_edges=0,
             total_cfg_edges=0,
             total_dfg_edges=0,
             total_call_edges=0,
             parse_duration_ms=round(duration_ms, 2),
+            repo_id=self.repo_id,
+            file_id=self.file_id,
+            parse_status=parse_status,
         )
 
     # ── INTERNAL: AST NODES ──────────────────────────────────────────────────
@@ -292,15 +480,18 @@ class CPGParser:
         """
         source_lines = source_code.splitlines()
 
-        for node in ast.walk(tree):
-            node_id   = id_col.get_id(node)
+        # Duyệt occurrence list để mỗi vị trí structural có ID riêng,
+        # kể cả khi CPython tái sử dụng singleton object cho Load/Add/...
+        for occurrence in id_col.occurrences:
+            node = occurrence.node
+            node_id = id_col.get_id_by_path(occurrence.structural_path)
             label     = _get_label(node)
             name      = _extract_name(node)
             line      = getattr(node, "lineno",         None)
             col       = getattr(node, "col_offset",     None)
             end_line  = getattr(node, "end_lineno",     None)
             end_col   = getattr(node, "end_col_offset", None)
-            scope     = _get_scope(node, parent_map)
+            scope = occurrence.scope
 
             # Lấy đoạn code tương ứng (chỉ 1 dòng, để tránh payload quá lớn)
             snippet = None
@@ -319,6 +510,7 @@ class CPGParser:
                 name=name,
                 code_snippet=snippet,
                 scope=scope,
+                **self._event_context(),
             )
 
     # ── INTERNAL: AST EDGES ──────────────────────────────────────────────────
@@ -332,19 +524,21 @@ class CPGParser:
         Sinh AST_CHILD edges: mỗi nút cha → các nút con trực tiếp.
         Đây là bộ xương cơ bản của CPG.
         """
-        for node in ast.walk(tree):
-            src_id = id_col.get_id(node)
-            for child in ast.iter_child_nodes(node):
-                tgt_id  = id_col.get_id(child)
-                edge_id = _stable_edge_id(self.relative_path, "AST_CHILD", src_id, tgt_id)
-                yield make_edge_event(
-                    edge_id=edge_id,
-                    file_path=self.relative_path,
-                    edge_type="AST_CHILD",
-                    source_id=src_id,
-                    target_id=tgt_id,
-                    properties={"child_type": child.__class__.__name__},
-                )
+        for occurrence in id_col.occurrences:
+            if occurrence.parent_path is None:
+                continue
+            src_id = id_col.get_id_by_path(occurrence.parent_path)
+            tgt_id = id_col.get_id_by_path(occurrence.structural_path)
+            edge_id = self._edge_id("AST_CHILD", src_id, tgt_id)
+            yield make_edge_event(
+                edge_id=edge_id,
+                file_path=self.relative_path,
+                edge_type="AST_CHILD",
+                source_id=src_id,
+                target_id=tgt_id,
+                properties={"child_type": occurrence.node.__class__.__name__},
+                **self._event_context(),
+            )
 
     # ── INTERNAL: CFG EDGES ──────────────────────────────────────────────────
 
@@ -376,7 +570,7 @@ class CPGParser:
                         continue
                     src_id  = id_col.get_id(src_stmt)
                     tgt_id  = id_col.get_id(tgt_stmt)
-                    edge_id = _stable_edge_id(self.relative_path, "CFG_NEXT", src_id, tgt_id)
+                    edge_id = self._edge_id("CFG_NEXT", src_id, tgt_id)
                     yield make_edge_event(
                         edge_id=edge_id,
                         file_path=self.relative_path,
@@ -384,6 +578,7 @@ class CPGParser:
                         source_id=src_id,
                         target_id=tgt_id,
                         properties={"sequence": i},
+                        **self._event_context(),
                     )
 
             # ── Branching: If / For / While ───────────────────────────────────
@@ -394,23 +589,25 @@ class CPGParser:
 
                 if body:
                     tgt_id  = id_col.get_id(body[0])
-                    edge_id = _stable_edge_id(self.relative_path, "CFG_BRANCH_TRUE", cond_id, tgt_id)
+                    edge_id = self._edge_id("CFG_BRANCH_TRUE", cond_id, tgt_id)
                     yield make_edge_event(
                         edge_id=edge_id,
                         file_path=self.relative_path,
                         edge_type="CFG_BRANCH_TRUE",
                         source_id=cond_id,
                         target_id=tgt_id,
+                        **self._event_context(),
                     )
                 if orelse:
                     tgt_id  = id_col.get_id(orelse[0])
-                    edge_id = _stable_edge_id(self.relative_path, "CFG_BRANCH_FALSE", cond_id, tgt_id)
+                    edge_id = self._edge_id("CFG_BRANCH_FALSE", cond_id, tgt_id)
                     yield make_edge_event(
                         edge_id=edge_id,
                         file_path=self.relative_path,
                         edge_type="CFG_BRANCH_FALSE",
                         source_id=cond_id,
                         target_id=tgt_id,
+                        **self._event_context(),
                     )
 
             # ── Try / Except ──────────────────────────────────────────────────
@@ -418,7 +615,7 @@ class CPGParser:
                 try_id = id_col.get_id(node)
                 for handler in getattr(node, "handlers", []):
                     h_id    = id_col.get_id(handler)
-                    edge_id = _stable_edge_id(self.relative_path, "CFG_EXCEPT", try_id, h_id)
+                    edge_id = self._edge_id("CFG_EXCEPT", try_id, h_id)
                     exc_name = getattr(handler.type, "id", "Exception") if handler.type else "Exception"
                     yield make_edge_event(
                         edge_id=edge_id,
@@ -427,6 +624,7 @@ class CPGParser:
                         source_id=try_id,
                         target_id=h_id,
                         properties={"exception_type": exc_name},
+                        **self._event_context(),
                     )
 
     # ── INTERNAL: DFG EDGES ──────────────────────────────────────────────────
@@ -470,7 +668,7 @@ class CPGParser:
                     # Chỉ nối nếu use xuất hiện SAU def (đơn giản hóa DFG)
                     if use_line >= def_line:
                         use_id  = id_col.get_id(use_node)
-                        edge_id = _stable_edge_id(self.relative_path, "DFG_USE", def_id, use_id)
+                        edge_id = self._edge_id("DFG_USE", def_id, use_id)
                         yield make_edge_event(
                             edge_id=edge_id,
                             file_path=self.relative_path,
@@ -478,6 +676,7 @@ class CPGParser:
                             source_id=def_id,
                             target_id=use_id,
                             properties={"variable_name": varname},
+                            **self._event_context(),
                         )
 
     # ── INTERNAL: CALL EDGES ─────────────────────────────────────────────────
@@ -539,7 +738,12 @@ class CPGParser:
                 callee_node = func_defs[callee_name]
                 callee_id   = id_col.get_id(callee_node)
                 src_id      = id_col.get_id(caller_func) if caller_func is not None else call_node_id
-                edge_id     = _stable_edge_id(self.relative_path, "CALL", src_id, callee_id)
+                edge_id = self._edge_id(
+                    "CALL",
+                    src_id,
+                    callee_id,
+                    discriminator=call_node_id,
+                )
                 yield make_edge_event(
                     edge_id=edge_id,
                     file_path=self.relative_path,
@@ -548,25 +752,35 @@ class CPGParser:
                     target_id=callee_id,
                     properties={
                         "callee_name": callee_name,
+                        "call_site_id": call_node_id,
                         "call_site_line": getattr(node, "lineno", None),
                         "is_external": False,
                     },
+                    **self._event_context(),
                 )
             else:
                 # External call: chỉ lưu metadata, không có target node
                 src_id  = id_col.get_id(caller_func) if caller_func is not None else call_node_id
-                edge_id = _stable_edge_id(self.relative_path, "CALL_EXTERNAL", src_id, callee_name)
+                target_id = f"external::{callee_name}"
+                edge_id = self._edge_id(
+                    "CALL_EXTERNAL",
+                    src_id,
+                    target_id,
+                    discriminator=call_node_id,
+                )
                 yield make_edge_event(
                     edge_id=edge_id,
                     file_path=self.relative_path,
                     edge_type="CALL_EXTERNAL",
                     source_id=src_id,
-                    target_id=f"external::{callee_name}",
+                    target_id=target_id,
                     properties={
                         "callee_name": callee_name,
+                        "call_site_id": call_node_id,
                         "call_site_line": getattr(node, "lineno", None),
                         "is_external": True,
                     },
+                    **self._event_context(),
                 )
 
 

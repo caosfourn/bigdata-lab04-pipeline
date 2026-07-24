@@ -3,9 +3,11 @@ Script tạo ra output thực tế của Task 1 & Task 2.
 Kết quả được dùng để điền vào notebook (nếu Jupyter chưa cài).
 """
 import sys, os, json
+from pathlib import Path
 
-os.chdir('d:\\HuynhHan\\Bigdata\\bigdata-lab04-pipeline')
-sys.path.insert(0, 'src')
+PROJECT_ROOT = Path(__file__).resolve().parent
+os.chdir(PROJECT_ROOT)
+sys.path.insert(0, str(PROJECT_ROOT / 'src'))
 
 from discovery import discover_python_files, EXCLUDE_DIRS, EXCLUDE_FILES
 from parser_service import CPGParser
