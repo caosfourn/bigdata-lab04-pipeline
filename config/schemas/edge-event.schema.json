@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cpg-lab.local/schemas/edge-event.schema.json",
+  "title": "cpg.edges event v1",
+  "allOf": [
+    { "$ref": "base-event.schema.json" },
+    {
+      "type": "object",
+      "required": ["edge_id", "type", "source_id", "target_id", "properties"],
+      "properties": {
+        "topic": { "const": "cpg.edges" },
+        "parse_status": { "const": "success" },
+        "file_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "edge_id": {
+          "type": "string",
+          "pattern": "^edge_[0-9a-f]{64}$"
+        },
+        "type": {
+          "enum": [
+            "AST_CHILD",
+            "CFG_NEXT",
+            "CFG_BRANCH_TRUE",
+            "CFG_BRANCH_FALSE",
+            "CFG_EXCEPT",
+            "DFG_USE",
+            "CALL",
+            "CALL_EXTERNAL"
+          ]
+        },
+        "source_id": {
+          "type": "string",
+          "pattern": "^node_[0-9a-f]{64}$"
+        },
+        "target_id": {
+          "type": "string",
+          "pattern": "^(node_[0-9a-f]{64}|external::.+)$"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "type": ["string", "number", "integer", "boolean", "array", "null"],
+            "items": { "type": ["string", "number", "integer", "boolean", "null"] }
+          }
+        }
+      }
+    }
+  ],
+  "unevaluatedProperties": false
+}
+

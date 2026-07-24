@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cpg-lab.local/schemas/error-event.schema.json",
+  "title": "cpg.errors event v1",
+  "allOf": [
+    { "$ref": "base-event.schema.json" },
+    {
+      "type": "object",
+      "required": ["error_type", "error_message", "line_number", "col_offset"],
+      "properties": {
+        "topic": { "const": "cpg.errors" },
+        "parse_status": { "const": "error" },
+        "error_type": { "type": "string", "minLength": 1 },
+        "error_message": { "type": "string" },
+        "line_number": { "type": ["integer", "null"], "minimum": 1 },
+        "col_offset": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    }
+  ],
+  "unevaluatedProperties": false
+}
+

@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cpg-lab.local/schemas/base-event.schema.json",
+  "title": "CPG Kafka base event v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "event_time",
+    "topic",
+    "repo_id",
+    "file_id",
+    "file_path",
+    "file_hash",
+    "parse_status"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "event_time": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "topic": {
+      "enum": ["cpg.nodes", "cpg.edges", "cpg.metadata", "cpg.errors"]
+    },
+    "repo_id": { "type": "string", "minLength": 1 },
+    "file_id": {
+      "type": "string",
+      "pattern": "^file_[0-9a-f]{64}$"
+    },
+    "file_path": { "type": "string", "minLength": 1 },
+    "file_hash": {
+      "type": "string",
+      "pattern": "^([0-9a-f]{64})?$"
+    },
+    "parse_status": { "enum": ["success", "error"] }
+  }
+}
+

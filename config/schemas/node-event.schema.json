@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cpg-lab.local/schemas/node-event.schema.json",
+  "title": "cpg.nodes event v1",
+  "allOf": [
+    { "$ref": "base-event.schema.json" },
+    {
+      "type": "object",
+      "required": ["node_id", "label", "properties"],
+      "properties": {
+        "topic": { "const": "cpg.nodes" },
+        "parse_status": { "const": "success" },
+        "file_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "node_id": {
+          "type": "string",
+          "pattern": "^node_[0-9a-f]{64}$"
+        },
+        "label": { "type": "string", "minLength": 1 },
+        "properties": {
+          "type": "object",
+          "required": [
+            "type",
+            "line_number",
+            "col_offset",
+            "end_lineno",
+            "end_col_offset",
+            "name",
+            "code_snippet",
+            "scope"
+          ],
+          "properties": {
+            "type": { "type": "string", "minLength": 1 },
+            "line_number": { "type": ["integer", "null"], "minimum": 1 },
+            "col_offset": { "type": ["integer", "null"], "minimum": 0 },
+            "end_lineno": { "type": ["integer", "null"], "minimum": 1 },
+            "end_col_offset": { "type": ["integer", "null"], "minimum": 0 },
+            "name": { "type": ["string", "null"] },
+            "code_snippet": { "type": ["string", "null"], "maxLength": 120 },
+            "scope": { "type": ["string", "null"] }
+          },
+          "additionalProperties": false
+        }
+      }
+    }
+  ],
+  "unevaluatedProperties": false
+}
+

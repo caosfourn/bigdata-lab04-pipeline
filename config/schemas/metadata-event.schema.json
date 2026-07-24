@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cpg-lab.local/schemas/metadata-event.schema.json",
+  "title": "cpg.metadata event v1",
+  "allOf": [
+    { "$ref": "base-event.schema.json" },
+    {
+      "type": "object",
+      "required": [
+        "file_size_bytes",
+        "total_nodes",
+        "total_edges",
+        "parser_version",
+        "parse_duration_ms"
+      ],
+      "properties": {
+        "topic": { "const": "cpg.metadata" },
+        "file_size_bytes": { "type": "integer", "minimum": 0 },
+        "total_nodes": { "type": "integer", "minimum": 0 },
+        "total_edges": {
+          "type": "object",
+          "required": ["ast", "cfg", "dfg", "call"],
+          "properties": {
+            "ast": { "type": "integer", "minimum": 0 },
+            "cfg": { "type": "integer", "minimum": 0 },
+            "dfg": { "type": "integer", "minimum": 0 },
+            "call": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "parser_version": { "type": "string", "minLength": 1 },
+        "parse_duration_ms": { "type": "number", "minimum": 0 }
+      }
+    }
+  ],
+  "unevaluatedProperties": false
+}
+
