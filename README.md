@@ -47,21 +47,64 @@ jupyter notebook notebooks/task1_task2_member1.ipynb
 ```
 
 ## Yêu cầu môi trường
-- Python 3.10+
+- Git
+- Python 3.9–3.11 (Python 3.9 được dùng trong CI)
+- Docker Desktop / Docker Engine có Docker Compose
+- Các cổng local còn trống: `7474`, `7687`, `8080`, `8083`, `9092`, `27017`
 - Không cần cài gói ngoài cho Thành viên 1 (dùng stdlib `ast`, `hashlib`, `os`)
 
 ```bash
-pip install -r requirements.txt   # Chỉ cần nếu chạy Kafka / Spark / Notebook
+python -m pip install -r requirements.txt
+python -m pip install pytest==7.4.3
 ```
 
 ## Quick start end-to-end
 
+Clone repository mục tiêu vào đúng thư mục được `.gitignore` loại trừ:
+
+```powershell
+git clone --depth=1 https://github.com/huggingface/lerobot.git lerobot
+```
+
+Khởi động hạ tầng và chờ đến khi Kafka, Neo4j và MongoDB báo `healthy`:
+
 ```powershell
 Copy-Item .env.example .env
 docker compose up -d --build
+docker compose ps
+
 .\scripts\create_topics.ps1
+Get-Content -Raw scripts\neo4j_constraints.cypher |
+  docker exec -i cpg-neo4j cypher-shell -u neo4j -p cpg-password
 .\scripts\register_neo4j_connector.ps1
-python -m src.kafka_producer lerobot --brokers localhost:9092
+
+python -m src.kafka_producer lerobot `
+  --file lerobot/src/lerobot/__init__.py `
+  --brokers localhost:9092
+```
+
+Chạy Spark trong Docker để tránh phụ thuộc `winutils.exe` trên Windows:
+
+```powershell
+.\scripts\run_person3_spark_docker.ps1
+```
+
+Trong terminal khác, gửi lại file rồi kiểm tra MongoDB:
+
+```powershell
+python -m src.kafka_producer lerobot `
+  --file lerobot/src/lerobot/__init__.py `
+  --brokers localhost:9092
+
+docker exec cpg-mongodb mongosh cpg --quiet --eval `
+  "db.metadata_person3.countDocuments({file_path:'src/lerobot/__init__.py'})"
+```
+
+Chạy toàn bộ test:
+
+```powershell
+python -m pytest -q
+docker compose --profile person3 config --quiet
 ```
 
 Giao diện local:
