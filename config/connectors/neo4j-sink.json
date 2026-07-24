@@ -1,0 +1,28 @@
+{
+  "connector.class": "org.neo4j.connectors.kafka.sink.Neo4jConnector",
+  "tasks.max": "1",
+  "topics": "cpg.nodes,cpg.edges,cpg.metadata",
+  "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+  "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+  "value.converter.schemas.enable": "false",
+  "neo4j.uri": "neo4j://neo4j:7687",
+  "neo4j.database": "neo4j",
+  "neo4j.authentication.type": "BASIC",
+  "neo4j.authentication.basic.username": "${env:NEO4J_USERNAME}",
+  "neo4j.authentication.basic.password": "${env:NEO4J_PASSWORD}",
+  "neo4j.batch-size": "500",
+  "neo4j.cypher.bind-header-as": "",
+  "neo4j.cypher.bind-key-as": "__key",
+  "neo4j.cypher.bind-value-as": "__value",
+  "neo4j.cypher.bind-value-as-event": "false",
+  "neo4j.cypher.topic.cpg.nodes": "WITH __value AS event MERGE (node:CPGNode {node_id: event.node_id}) SET node.repo_id = event.repo_id, node.file_id = event.file_id, node.file_path = event.file_path, node.file_hash = event.file_hash, node.ast_label = event.label, node.schema_version = event.schema_version, node.event_time = event.event_time, node.placeholder = false SET node += event.properties",
+  "neo4j.cypher.topic.cpg.edges": "WITH __value AS event MERGE (source:CPGNode {node_id: event.source_id}) ON CREATE SET source.placeholder = true SET source.repo_id = coalesce(source.repo_id, event.repo_id), source.file_id = coalesce(source.file_id, event.file_id), source.file_path = coalesce(source.file_path, event.file_path), source.file_hash = event.file_hash MERGE (target:CPGNode {node_id: event.target_id}) ON CREATE SET target.placeholder = true FOREACH (_ IN CASE WHEN coalesce(event.properties.is_external, false) THEN [1] ELSE [] END | SET target.external = true, target.placeholder = false, target.name = event.properties.callee_name) FOREACH (_ IN CASE WHEN coalesce(event.properties.is_external, false) THEN [] ELSE [1] END | SET target.repo_id = coalesce(target.repo_id, event.repo_id), target.file_id = coalesce(target.file_id, event.file_id), target.file_path = coalesce(target.file_path, event.file_path), target.file_hash = event.file_hash) MERGE (source)-[edge:CPG_EDGE {edge_id: event.edge_id}]->(target) SET edge.edge_type = event.type, edge.repo_id = event.repo_id, edge.file_id = event.file_id, edge.file_path = event.file_path, edge.file_hash = event.file_hash, edge.schema_version = event.schema_version, edge.event_time = event.event_time SET edge += event.properties",
+  "neo4j.cypher.topic.cpg.metadata": "WITH __value AS event MERGE (file:SourceFile {file_id: event.file_id}) SET file.repo_id = event.repo_id, file.file_path = event.file_path, file.file_hash = event.file_hash, file.file_size_bytes = event.file_size_bytes, file.total_nodes = event.total_nodes, file.total_ast_edges = event.total_edges.ast, file.total_cfg_edges = event.total_edges.cfg, file.total_dfg_edges = event.total_edges.dfg, file.total_call_edges = event.total_edges.call, file.parser_version = event.parser_version, file.parse_status = event.parse_status, file.schema_version = event.schema_version, file.event_time = event.event_time WITH event WHERE event.parse_status = 'success' OPTIONAL MATCH ()-[stale_edge:CPG_EDGE]-() WHERE stale_edge.file_id = event.file_id AND stale_edge.file_hash <> event.file_hash DELETE stale_edge WITH event OPTIONAL MATCH (stale_node:CPGNode) WHERE stale_node.file_id = event.file_id AND stale_node.file_hash <> event.file_hash DETACH DELETE stale_node",
+  "errors.tolerance": "all",
+  "errors.log.enable": "true",
+  "errors.log.include.messages": "true",
+  "errors.deadletterqueue.topic.name": "cpg.neo4j.dlq",
+  "errors.deadletterqueue.topic.replication.factor": "1",
+  "errors.deadletterqueue.context.headers.enable": "true"
+}
+

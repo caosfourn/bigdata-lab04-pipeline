@@ -1,0 +1,150 @@
+name: cpg-pipeline
+
+services:
+  kafka:
+    image: confluentinc/cp-kafka:7.8.0
+    hostname: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,HOST:PLAINTEXT
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,CONTROLLER://0.0.0.0:29093,HOST://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,HOST://localhost:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  kafka-init:
+    image: confluentinc/cp-kafka:7.8.0
+    depends_on:
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ./infra/kafka/create-topics.sh:/opt/cpg/create-topics.sh:ro
+    entrypoint: ["bash", "/opt/cpg/create-topics.sh"]
+    restart: "no"
+
+  neo4j:
+    image: neo4j:5.26-community
+    hostname: neo4j
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-cpg-password}
+      NEO4J_server_memory_heap_initial__size: 256m
+      NEO4J_server_memory_heap_max__size: 512m
+      NEO4J_server_memory_pagecache_size: 256m
+    volumes:
+      - neo4j-data:/data
+      - neo4j-logs:/logs
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "cypher-shell -a bolt://localhost:7687 -u neo4j -p \"${NEO4J_PASSWORD:-cpg-password}\" 'RETURN 1' >/dev/null 2>&1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 30s
+
+  neo4j-init:
+    image: neo4j:5.26-community
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    volumes:
+      - ./infra/neo4j/constraints.cypher:/opt/cpg/constraints.cypher:ro
+    entrypoint: ["cypher-shell"]
+    command:
+      - -a
+      - bolt://neo4j:7687
+      - -u
+      - neo4j
+      - -p
+      - ${NEO4J_PASSWORD:-cpg-password}
+      - -f
+      - /opt/cpg/constraints.cypher
+    restart: "no"
+
+  connect:
+    build:
+      context: ./infra/connect
+      args:
+        NEO4J_CONNECTOR_VERSION: 5.5.0
+        NEO4J_CONNECTOR_SHA256: b40cdd1d498c9d688af7580a32e8cc50c000d5d134051b60821cc24c5f3c7d68
+    hostname: connect
+    ports:
+      - "8083:8083"
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+      neo4j-init:
+        condition: service_completed_successfully
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS: kafka:29092
+      CONNECT_REST_ADVERTISED_HOST_NAME: connect
+      CONNECT_GROUP_ID: cpg-connect-cluster
+      CONNECT_CONFIG_STORAGE_TOPIC: _cpg_connect_configs
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_OFFSET_STORAGE_TOPIC: _cpg_connect_offsets
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_OFFSET_STORAGE_PARTITIONS: 1
+      CONNECT_STATUS_STORAGE_TOPIC: _cpg_connect_status
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_KEY_CONVERTER: org.apache.kafka.connect.storage.StringConverter
+      CONNECT_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+      CONNECT_PLUGIN_PATH: /usr/share/java,/usr/share/confluent-hub-components
+      CONNECT_CONFIG_PROVIDERS: env
+      CONNECT_CONFIG_PROVIDERS_ENV_CLASS: org.apache.kafka.common.config.provider.EnvVarConfigProvider
+      CONNECT_LOG4J_ROOT_LOGLEVEL: INFO
+      NEO4J_USERNAME: neo4j
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-cpg-password}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8083/connector-plugins >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 30s
+
+  connector-init:
+    image: curlimages/curl:8.10.1
+    depends_on:
+      connect:
+        condition: service_healthy
+    volumes:
+      - ./config/connectors/neo4j-sink.json:/config/neo4j-sink.json:ro
+    command:
+      - -fsS
+      - -X
+      - PUT
+      - -H
+      - Content-Type:application/json
+      - --data-binary
+      - "@/config/neo4j-sink.json"
+      - http://connect:8083/connectors/cpg-neo4j-sink/config
+    restart: "no"
+
+volumes:
+  kafka-data:
+  neo4j-data:
+  neo4j-logs:
