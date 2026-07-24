@@ -5,5 +5,10 @@ discovered_files.json
 *.egg-info/
 .env
 .venv/
+.venv-spark/
 .pytest_cache/
 .ipynb_checkpoints/
+.jupyter_cache/
+_build/
+checkpoints/
+runtime/

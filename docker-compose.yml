@@ -41,6 +41,17 @@ services:
     entrypoint: ["bash", "/opt/cpg/create-topics.sh"]
     restart: "no"
 
+  kafka-ui:
+    image: provectuslabs/kafka-ui:v0.7.2
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: cpg-local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+    depends_on:
+      kafka:
+        condition: service_healthy
+
   neo4j:
     image: neo4j:5.26-community
     hostname: neo4j
@@ -144,7 +155,63 @@ services:
       - http://connect:8083/connectors/cpg-neo4j-sink/config
     restart: "no"
 
+  mongodb:
+    image: mongo:7.0.12
+    hostname: mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE:-cpg}
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  spark-person3:
+    image: apache/spark:3.5.1-scala2.12-java17-python3-ubuntu
+    profiles: ["person3"]
+    user: "0:0"
+    working_dir: /opt/project
+    environment:
+      PYSPARK_PYTHON: python3
+      PYSPARK_DRIVER_PYTHON: python3
+    volumes:
+      - .:/opt/project:ro
+      - ./runtime/spark-ivy:/opt/ivy
+      - ./checkpoints:/opt/checkpoints
+    entrypoint: ["/opt/spark/bin/spark-submit"]
+    command:
+      - --master
+      - local[1]
+      - --conf
+      - spark.jars.ivy=/opt/ivy
+      - --packages
+      - org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1,org.mongodb.spark:mongo-spark-connector_2.12:10.7.0
+      - /opt/project/src/metadata_streaming_job.py
+      - --brokers
+      - kafka:29092
+      - --topic
+      - cpg.metadata
+      - --mongo-uri
+      - mongodb://mongodb:27017
+      - --mongo-db
+      - cpg
+      - --mongo-collection
+      - metadata
+      - --checkpoint-location
+      - /opt/checkpoints/person3-final-docker
+    depends_on:
+      kafka:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+
 volumes:
   kafka-data:
   neo4j-data:
   neo4j-logs:
+  mongo-data:

@@ -5,6 +5,11 @@ Kết quả được dùng để điền vào notebook (nếu Jupyter chưa cài
 import sys, os, json
 from pathlib import Path
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 PROJECT_ROOT = Path(__file__).resolve().parent
 os.chdir(PROJECT_ROOT)
 sys.path.insert(0, str(PROJECT_ROOT / 'src'))
@@ -12,7 +17,8 @@ sys.path.insert(0, str(PROJECT_ROOT / 'src'))
 from discovery import discover_python_files, EXCLUDE_DIRS, EXCLUDE_FILES
 from parser_service import CPGParser
 
-REPO_ROOT = os.path.abspath('lerobot')
+SAMPLE_REPO = PROJECT_ROOT / 'lerobot'
+REPO_ROOT = SAMPLE_REPO.resolve()
 
 # ─── TASK 1 ───────────────────────────────────────────────────────────────────
 print("=" * 65)

@@ -17,6 +17,8 @@ Ghi chú về thư viện:
   Thích hợp cho môi trường hạn chế, đủ để trích xuất AST/CFG/DFG/CALL.
 """
 
+from __future__ import annotations
+
 import ast
 import hashlib
 import os
@@ -791,6 +793,8 @@ class CPGParser:
 if __name__ == "__main__":
     import sys
     import json
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
     if len(sys.argv) < 3:
         print("Usage: python parser_service.py <absolute_file_path> <repo_root>")

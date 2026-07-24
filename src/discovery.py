@@ -140,6 +140,8 @@ def discover_python_files(repo_path: str) -> list[dict]:
 
 if __name__ == "__main__":
     import sys
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
     repo_root = sys.argv[1] if len(sys.argv) > 1 else "../lerobot"
 

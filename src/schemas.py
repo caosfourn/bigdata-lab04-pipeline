@@ -11,6 +11,8 @@ Kafka Topic Layout (khớp với yêu cầu Task 3):
   - cpg.errors     : Parser error events
 """
 
+from __future__ import annotations
+
 import datetime
 
 # ─────────────────────────────────────────────────────────────────────────────

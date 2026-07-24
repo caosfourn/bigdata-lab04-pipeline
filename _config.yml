@@ -1,0 +1,28 @@
+title: "Lab 04 — Incremental CPG Streaming Pipeline"
+author: "Big Data Lab Team"
+copyright: "2026"
+only_build_toc_files: true
+exclude_patterns:
+  - ".venv/**"
+  - ".venv-spark/**"
+  - ".pytest_cache/**"
+  - ".ipynb_checkpoints/**"
+  - "runtime/**"
+  - "checkpoints/**"
+  - "docs/**"
+  - "README.md"
+  - "[[]BigData[]] Lab04 - StreamingV0.md"
+execute:
+  execute_notebooks: "off"
+  timeout: 180
+parse:
+  myst_enable_extensions:
+    - colon_fence
+    - deflist
+    - dollarmath
+repository:
+  url: "https://github.com/caosfourn/bigdata-lab04-pipeline"
+  branch: main
+html:
+  use_repository_button: true
+  use_issues_button: true
