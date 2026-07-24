@@ -11,6 +11,8 @@ Kafka Topic Layout (khớp với yêu cầu Task 3):
   - cpg.errors     : Parser error events
 """
 
+from __future__ import annotations
+
 import datetime
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -31,7 +33,7 @@ SCHEMA_VERSION = "1.0"
 
 def _now_iso() -> str:
     """Trả về timestamp UTC hiện tại theo định dạng ISO 8601."""
-    return datetime.datetime.utcnow().isoformat() + "Z"
+    return datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
