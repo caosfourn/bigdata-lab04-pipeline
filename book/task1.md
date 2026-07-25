@@ -88,16 +88,12 @@ src/lerobot/__init__.py                  1965 bytes
 
 ![Terminal output from the final LeRobot discovery run](images/task1-discovery-terminal.png)
 
-The terminal capture records the real operator command, the selected
-`huggingface/lerobot` repository, the active exclusion policy, and the final
-490-file result. The lower portion also begins the bounded parser demonstration,
-showing that the manifest is consumed in deterministic order rather than being
-reported as a hand-entered total.
+The run found 490 files after applying the displayed exclusions to the pinned
+`huggingface/lerobot` checkout. The first parser rows at the bottom use the same
+sorted manifest.
 
-The executed notebook directly below this chapter asserts the discovery
-acceptance criteria against the committed live-evidence summary. Task 2 has a
-separate parser-only notebook, so cloning and discovery output is not duplicated
-in the book navigation.
+The notebook below checks the discovery counts against the saved run summary.
+Parser output is kept in the separate Task 2 notebook.
 
 ## Reflection
 

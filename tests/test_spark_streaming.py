@@ -18,10 +18,10 @@ if SparkSession is not None:
 
 
 @unittest.skipIf(SparkSession is None, "pyspark is not installed")
-class Person3SparkTests(unittest.TestCase):
+class SparkStreamingTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.spark = SparkSession.builder.master("local[1]").appName("person3-tests").getOrCreate()
+        cls.spark = SparkSession.builder.master("local[1]").appName("metadata-stream-tests").getOrCreate()
         cls.spark.sparkContext.setLogLevel("ERROR")
 
     @classmethod

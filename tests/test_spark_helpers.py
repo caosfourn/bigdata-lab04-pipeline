@@ -5,7 +5,7 @@ from src.spark_mongo_sink import build_mongo_write_config
 from src.schemas import make_metadata_event
 
 
-class Person3HelperTests(unittest.TestCase):
+class SparkHelperTests(unittest.TestCase):
     def test_kafka_reader_options(self):
         options = build_spark_reader_options("kafka:9092", "cpg.metadata")
         self.assertEqual(options["kafka.bootstrap.servers"], "kafka:9092")

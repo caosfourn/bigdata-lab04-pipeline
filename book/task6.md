@@ -2,7 +2,7 @@
 
 ## Experiment design
 
-This task is a state-transition experiment, not only an exact-message replay.
+This task checks state transitions as well as exact-message replay.
 One LeRobot file keeps the same repo-scoped `file_id` while its content hash and
 CPG change. The complete pipeline must converge on the new current state without
 retaining duplicate or stale elements.
@@ -14,7 +14,7 @@ baseline revision -> exact baseline replay -> modified revision
 
 The controlled target should be a small source file such as
 `src/lerobot/__init__.py`. Record the initial Git diff first and make one harmless,
-clearly marked source change—for example, add a tiny function—so the before and
+small, marked source change—for example, add a tiny function—so the before and
 after parser totals are explainable.
 
 ## Reproducible procedure
@@ -32,7 +32,7 @@ shasum -a 256 lerobot/src/lerobot/__init__.py
 # Neo4j, MongoDB and the checkpoint in one read-only command.
 .venv/bin/python scripts/verify_replay.py src/lerobot/__init__.py \
   --repo-id huggingface/lerobot \
-  --checkpoint-location checkpoints/person3-final-docker \
+  --checkpoint-location checkpoints/metadata-stream \
   --output runtime/task6/baseline.json
 ```
 
@@ -60,7 +60,7 @@ Then collect the same snapshot:
 ```bash
 .venv/bin/python scripts/verify_replay.py src/lerobot/__init__.py \
   --repo-id huggingface/lerobot \
-  --checkpoint-location checkpoints/person3-final-docker \
+  --checkpoint-location checkpoints/metadata-stream \
   --output runtime/task6/modified.json
 
 docker compose exec -T neo4j cypher-shell \
@@ -80,14 +80,14 @@ unchanged, and save `runtime/task6/modified-replay.json`. Then restart Spark
 without changing or deleting its checkpoint:
 
 ```bash
-docker compose stop spark-person3
-docker compose start spark-person3
-docker compose logs --since=5m spark-person3
+docker compose stop spark-metadata
+docker compose start spark-metadata
+docker compose logs --since=5m spark-metadata
 
 # With no new publish after restart, take the fifth snapshot.
 .venv/bin/python scripts/verify_replay.py src/lerobot/__init__.py \
   --repo-id huggingface/lerobot \
-  --checkpoint-location checkpoints/person3-final-docker \
+  --checkpoint-location checkpoints/metadata-stream \
   --output runtime/task6/restart.json
 ```
 
@@ -203,9 +203,9 @@ new metadata offset.
 
 ![Automated Task 6 acceptance report](images/task6-verifier-89-of-89.png)
 
-The final verifier reports `passed: true`, all 89 checks evaluated, no failed
-checks and an empty failure list. Together, these terminal captures provide the
-raw before/after evidence behind the measurement table above.
+The final verifier reports `passed: true`: all 89 checks ran, with no failed
+checks and an empty failure list. The measurement table above uses these
+before-and-after values.
 
 ## Reflection
 
@@ -214,6 +214,6 @@ elements that disappeared from a changed file. A successful metadata event is
 therefore the revision boundary for Neo4j stale-state cleanup. MongoDB models
 one current document per `file_id`, so replace/upsert naturally supersedes the
 old hash. Finally, Spark checkpoint evidence must be captured after a real stop
-and restart; simply starting a fresh query does not demonstrate recovery. The
+and restart; starting a fresh query does not test checkpoint recovery. The
 two-stage exact-and-modified replay separates duplicate safety from update
 correctness and makes failures easier to diagnose.

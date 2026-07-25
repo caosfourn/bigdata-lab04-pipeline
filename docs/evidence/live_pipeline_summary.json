@@ -158,7 +158,7 @@
       "target_edges": {"ast": 80, "cfg": 6, "dfg": 1, "call": 1}
     },
     "checkpoint": {
-      "location": "checkpoints/person3-final-docker",
+      "location": "checkpoints/metadata-stream",
       "latest_committed_batch": 124,
       "committed_offsets": {"0": 178, "1": 175, "2": 147},
       "committed_offset_total": 500,

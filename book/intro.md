@@ -41,8 +41,8 @@ cannot be mistaken for the final repository experiment:
   database/checkpoint snapshots and the automated acceptance report; values are
   never inferred from fixture results.
 
-The fixture evidence proves the implementation path and its idempotency. The
-final LeRobot capture proves that the same path was exercised on the repository
+The fixture run checks the implementation path and its idempotency. The final
+LeRobot capture records the same path running on the repository
 selected in Moodle.
 
 ## Minimal reproduction
@@ -57,7 +57,7 @@ python3.14 -m venv .venv
   kafka-python==3.0.8 jsonschema==4.25.1 \
   neo4j==5.20.0 pymongo==4.6.3
 cp .env.example .env
-docker compose --profile person3 up -d --build
+docker compose --profile spark up -d --build
 .venv/bin/python src/discovery.py lerobot
 .venv/bin/python -m src.kafka_publisher lerobot \
   src/lerobot/__init__.py --repo-id huggingface/lerobot

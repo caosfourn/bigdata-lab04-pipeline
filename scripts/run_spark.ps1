@@ -4,7 +4,7 @@ param(
     [string]$MongoUri = "mongodb://localhost:27017",
     [string]$MongoDatabase = "cpg",
     [string]$MongoCollection = "metadata",
-    [string]$CheckpointName = "person3-final"
+    [string]$CheckpointName = "metadata-stream"
 )
 
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path

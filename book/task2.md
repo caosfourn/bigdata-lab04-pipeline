@@ -35,9 +35,8 @@ dropping valid upstream files.
 | DFG | `DFG_USE` edge | definition-to-use within parser scope |
 | Calls | `CALL` / `CALL_EXTERNAL` edge | resolved local functions or external symbol |
 
-The CFG and DFG are deliberately documented as educational, intra-file
-approximations; they are not a whole-program type or alias analysis. That
-trade-off preserves bounded execution and requires no native parser dependency.
+The CFG and DFG are intrafile approximations, not whole-program type or alias
+analysis. This keeps execution bounded and requires no native parser dependency.
 
 ## Stable identity and event contract
 
@@ -105,10 +104,9 @@ parser errors: 0
 
 ![Parser edge totals and stable-ID replay test](images/task2-parser-stable-id.png)
 
-This unedited terminal capture shows AST, CFG, DFG and call-edge totals for the
-five-file demonstration. Parsing the representative file three times produced
-the same 1,003 nodes and 1,272 edges on every run; both node and edge identity
-checks ended in `PASS`.
+The five-file run reports AST, CFG, DFG, and call-edge totals. Parsing the
+selected file three times produced the same 1,003 nodes and 1,272 edges; both
+identity checks ended in `PASS`.
 
 The compact repository-level record is retained at
 `docs/evidence/task1_task2_lerobot_final.md`; the executed notebook below shows
@@ -116,8 +114,8 @@ the representative payloads and calculations.
 
 ```{admonition} Executed notebook
 :class: important
-The notebook embedded immediately after this chapter was re-executed against
-the pinned LeRobot commit and the current full-SHA-256 contract. It contains
+The notebook below was run against the pinned LeRobot commit and the current
+full-SHA-256 contract. It contains
 sample node/edge/metadata payloads and the exact replay comparison. A discovery
 entry may display the operator's absolute path for locating the file, but all
 identity-bearing event paths and stable IDs use the repository-relative path.
@@ -130,7 +128,7 @@ line or column, and shortened digests weakened the uniqueness guarantee. The
 current structural-path strategy uses the full digest and is protected by
 contract tests. The first full run under Python 3.11 also exposed four
 upstream-syntax failures; running the selected repository under Python 3.14
-resolved them without exclusions. Standard `ast` made the parser predictable, while
-the bounded intra-file CFG/DFG intentionally sacrifices whole-program semantic
+resolved them without exclusions. Standard `ast` made the parser predictable,
+while the bounded intrafile CFG/DFG does not provide whole-program semantic
 precision. Parser failures are retained as observable events instead of
 terminating a repository-wide run.

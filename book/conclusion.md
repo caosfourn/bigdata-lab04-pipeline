@@ -36,21 +36,19 @@ Before publication, all of these conditions must be true:
 - Kafka, Neo4j, MongoDB, and Spark restart evidence figures are embedded in
   their corresponding chapters.
 - Raw logs/JSON used by the figures remain in the public repository.
-- The executed Task 1–2 notebook agrees with the current full-ID code and the
-  pinned commit.
+- The executed Task 1 and Task 2 notebooks agree with the current full-ID code
+  and the pinned commit.
 - `jupyter-book build . --all --warningiserror` exits successfully.
-- CI tests and the Pages deployment job are green on `main`.
+- CI tests and the Pages deployment job are green on the report branch.
 - The public site opens from a signed-out/incognito browser and repository links
   do not require authentication.
 
 ## Publishing and Moodle submission
 
 Repository administrators must select **Settings → Pages → Build and
-deployment → Source: GitHub Actions** once. The workflow validates pull requests
-(and manually dispatched feature branches) but intentionally deploys only a
-successful build of `main`. After the completed branch is reviewed and merged,
-pushing `main` uploads `_build/html` and deploys it to the `github-pages`
-environment.
+deployment → Source: GitHub Actions** once. Run the workflow manually for the
+report branch. A successful test job builds `_build/html`, and the deploy job
+publishes it to the `github-pages` environment.
 
 For this repository, the expected root address is:
 

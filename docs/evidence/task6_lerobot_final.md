@@ -40,7 +40,7 @@ cpg.neo4j.dlq end offset: 0
 MongoDB contained 490 LeRobot documents with 490 distinct `file_id` values and
 no duplicate groups. The complete collection contained 493 documents because
 three repository-owned fixture documents from earlier dated integration runs
-were intentionally retained.
+were retained.
 
 ## Controlled source change
 

@@ -4,9 +4,8 @@ Execution date: 2026-07-21
 Environment: local Docker Compose, Neo4j Community 5.26, Neo4j Kafka
 Connector 5.5.0, Confluent Kafka/Connect 7.8.0.
 
-This file records the text evidence from the member-2 integration run. The
-final Jupyter Book supplements it with executed cells from the Moodle-selected
-repository and a dated Neo4j query evidence figure.
+These results come from the Kafka-to-Neo4j integration run. The Jupyter Book
+adds the executed repository cells and dated Neo4j query screenshots.
 
 ## Kafka topic
 
@@ -50,7 +49,7 @@ edges=497, distinct_edge_ids=497
 placeholder_nodes=0
 ```
 
-Therefore an at-least-once delivery/replay did not duplicate graph elements.
+The replay left the node and edge counts unchanged.
 
 ## Modified-file replay
 
@@ -72,6 +71,6 @@ file, status, expected_nodes, nodes, edges
 "src/schemas.py", "success", 467, 467, 497
 ```
 
-This evidence covers the earlier fixture-scope Kafka-to-Neo4j run. The completed
-five-phase LeRobot run, including MongoDB and Spark checkpoint state, is recorded
+This was the fixture-scope Kafka-to-Neo4j run. The completed five-phase LeRobot
+run, including MongoDB and Spark checkpoint state, is recorded
 in `docs/evidence/task6_lerobot_final.md`.

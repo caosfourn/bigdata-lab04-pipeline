@@ -47,7 +47,7 @@ stable IDs on exact replay: true
 The publisher dry-run processed the manifest one source at a time. The pinned
 LeRobot revision requires Python 3.14: running the same checkout under Python
 3.11 produced syntax failures in four valid upstream files, so Python 3.14 was
-used rather than excluding them.
+used so those files could remain in the manifest.
 
 ```text
 files processed: 490

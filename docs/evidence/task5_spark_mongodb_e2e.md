@@ -15,7 +15,7 @@ numInputRows: 6
 endOffset: {cpg.metadata: {0: 4, 1: 2, 2: 0}}
 maxOffsetsBehindLatest: 0
 MongoStreamingWrite: committed
-checkpoint commit: /opt/checkpoints/person3-final-docker/commits/0
+checkpoint commit: /opt/checkpoints/metadata-stream/commits/0
 ```
 
 The six Kafka records represented repeated revisions of three stable files.
@@ -67,7 +67,7 @@ documents_for_replayed_file_id: 1
 event_time: 2026-07-24T16:42:23.997639Z
 ```
 
-This run proves schema compatibility, MongoDB replace/upsert behavior and
+This run checks schema compatibility, MongoDB replace/upsert behavior and
 resume from a persisted checkpoint at fixture scope. The completed dated
 LeRobot replay and restart are recorded in
 `docs/evidence/task6_lerobot_final.md`.

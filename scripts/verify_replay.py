@@ -5,7 +5,7 @@ The script has two modes:
 * snapshot mode reads the current Neo4j, MongoDB and Spark checkpoint state;
 * sequence mode compares baseline, exact-replay, modified and restart snapshots.
 
-It is intentionally read-only. Publishing, editing the selected source file and
+It is read-only. Publishing, editing the selected source file and
 restarting Spark remain explicit operator actions, which makes the evidence easy
 to reproduce and prevents an acceptance script from mutating source or data.
 """
@@ -22,7 +22,7 @@ from typing import Any
 
 
 SNAPSHOT_SCHEMA_VERSION = "2.0"
-DEFAULT_CHECKPOINT = "checkpoints/person3-final-docker"
+DEFAULT_CHECKPOINT = "checkpoints/metadata-stream"
 
 
 def _utc_now() -> str:

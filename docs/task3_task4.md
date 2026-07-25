@@ -1,14 +1,13 @@
 # Task 3–4 — Kafka topics and idempotent Neo4j sink
 
-## Scope and ownership
+## Scope
 
-Member 2 owns the delivery boundary from Parser Service to Kafka, the topic
-bootstrap, Kafka Connect worker, Neo4j service, connector registration, Cypher
-mapping, constraints, and verification queries. Member 3 may extend the same
-Compose project with Spark and MongoDB, but Spark must not sit between Kafka
-and Neo4j.
+Tasks 3 and 4 cover delivery from the parser to Kafka, topic bootstrap, Kafka
+Connect, Neo4j, connector registration, Cypher mapping, constraints, and
+verification queries. Spark and MongoDB share the Compose project but are not
+part of the Kafka-to-Neo4j path.
 
-The local version matrix is intentionally pinned:
+The local version matrix is pinned:
 
 | Component | Version |
 |---|---:|
@@ -72,7 +71,7 @@ Node ingestion uses `MERGE` on `node_id`. Edge ingestion first `MERGE`s both
 endpoint nodes as placeholders and then `MERGE`s the relationship on
 `edge_id`. This matters because Kafka has ordering only inside a topic
 partition, not across `cpg.nodes` and `cpg.edges`. A later node event fills an
-internal placeholder; `CALL_EXTERNAL` deliberately resolves to an external
+internal placeholder; `CALL_EXTERNAL` resolves to an external
 symbol placeholder.
 
 Metadata events are also observed by the Neo4j connector for snapshot
@@ -84,7 +83,7 @@ group for MongoDB.
 
 Kafka Connect is at-least-once in this Community setup. Database uniqueness
 constraints plus Cypher `MERGE` make replay idempotent. Connector-level
-exactly-once offset tracking is intentionally not enabled because its offset
+exactly-once offset tracking is not enabled because its offset
 node requires an Enterprise `NODE KEY`; the lab only requires an idempotent
 result.
 
@@ -156,4 +155,3 @@ Official references:
 - [Cypher sink strategy](https://neo4j.com/docs/kafka/current/sink/cypher/)
 - [Neo4j sink settings](https://neo4j.com/docs/kafka/current/sink/configuration/)
 - [Neo4j constraints](https://neo4j.com/docs/cypher-manual/5/constraints/)
-

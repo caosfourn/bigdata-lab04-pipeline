@@ -10,13 +10,13 @@ concern. A new revision of the same file therefore replaces one current-state
 document instead of adding a second copy.
 
 ```bash
-docker compose --profile person3 up -d spark-person3
-docker compose logs --tail=200 -f spark-person3
+docker compose --profile spark up -d spark-metadata
+docker compose logs --tail=200 -f spark-metadata
 ```
 
 The Compose service runs Spark 3.5.1 with the Kafka SQL package and MongoDB
 Spark Connector 10.7.0. Its durable host-mounted checkpoint is
-`./checkpoints/person3-final-docker`; that path must remain unchanged during a
+`./checkpoints/metadata-stream`; that path must remain unchanged during a
 restart test.
 
 ```bash
@@ -46,7 +46,7 @@ numInputRows: 6
 endOffset: {cpg.metadata: {0: 4, 1: 2, 2: 0}}
 maxOffsetsBehindLatest: 0
 MongoStreamingWrite: committed
-checkpoint commit: /opt/checkpoints/person3-final-docker/commits/0
+checkpoint commit: /opt/checkpoints/metadata-stream/commits/0
 ```
 
 Those six records represented repeated revisions of three stable files. The
@@ -93,7 +93,7 @@ documents_for_replayed_file_id: 1
 event_time: 2026-07-24T16:42:23.997639Z
 ```
 
-This proves schema compatibility, connector replace/upsert, and persisted
+This checks schema compatibility, connector replace/upsert, and persisted
 offset recovery for the committed fixture run. The raw record is retained in
 `docs/evidence/task5_spark_mongodb_e2e.md`.
 
@@ -101,12 +101,12 @@ offset recovery for the committed fixture run. The raw record is retained in
 
 ```bash
 # Record collection state and latest committed offsets.
-docker compose stop spark-person3
-find checkpoints/person3-final-docker/commits -maxdepth 1 -type f | sort
+docker compose stop spark-metadata
+find checkpoints/metadata-stream/commits -maxdepth 1 -type f | sort
 
 # Start without deleting or changing the checkpoint.
-docker compose start spark-person3
-docker compose logs --since=5m spark-person3
+docker compose start spark-metadata
+docker compose logs --since=5m spark-metadata
 ```
 
 With no new Kafka record, committed and available offsets must match and the

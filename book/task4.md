@@ -146,15 +146,12 @@ IDs after the controlled source modification.
 
 ![LeRobot edge count equals its distinct edge-ID count](images/task4-neo4j-unique-edge-counts.png)
 
-The corresponding relationship query returns 830,500 edges and 830,500
-distinct edge IDs, providing direct UI evidence that replay did not duplicate
-topology.
+The relationship query returns 830,500 edges and 830,500 distinct edge IDs.
 
 ![Rendered CPG topology for the modified source file](images/task4-neo4j-graph.png)
 
-Neo4j Browser renders the bounded graph query for
-`src/lerobot/__init__.py`, demonstrating that the persisted records form a
-navigable topology rather than only aggregate counters.
+The bounded query for `src/lerobot/__init__.py` returned the connected graph
+shown in Neo4j Browser.
 
 ## Reflection
 
@@ -164,7 +161,7 @@ constraints plus `MERGE` solved the first; explicit placeholders solved the
 second without dropping edges. File metadata supplies the successful revision
 boundary needed to remove stale elements. Per-file hash and `event_time` guards
 also reject a delayed old revision, while allowing same-revision replays. Cleanup
-is intentionally skipped for failed parses, preserving the last valid graph
+is skipped for failed parses, preserving the last valid graph
 instead of replacing it with an empty or partial revision. The remaining
 ordering condition is endpoint arrival: acceptance waits for connector lag zero
 and requires no unresolved internal placeholder. Producer timestamps are UTC,

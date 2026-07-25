@@ -13,7 +13,7 @@
 | Failures | `cpg.errors` / connector DLQ → monitoring | separate parser and infrastructure failures |
 
 The Parser Service is the only component that understands Python syntax. Kafka
-is the contract boundary: Neo4j and Spark depend on versioned events rather than
+is the contract boundary: Neo4j and Spark depend on versioned events instead of
 parser internals. The two database branches can scale and recover independently.
 
 ## Idempotency at every boundary
@@ -21,7 +21,7 @@ parser internals. The two database branches can scale and recover independently.
 | Boundary | Mechanism | Failure/replay behavior |
 |---|---|---|
 | Parser | deterministic full SHA-256 IDs | unchanged content emits the same identities |
-| Producer | stable Kafka key, `acks=all`, idempotent producer | retry does not intentionally create a new key |
+| Producer | stable Kafka key, `acks=all`, idempotent producer | a retry keeps the same key |
 | Neo4j | uniqueness constraints and Cypher `MERGE` | at-least-once records update existing elements |
 | Graph revision | stable `file_id`, changing `file_hash`, guarded `event_time` | same revision may replay; late older revision is rejected; successful metadata removes stale graph |
 | MongoDB | `_id = file_id`, replace/upsert | one current document per repo-scoped file |

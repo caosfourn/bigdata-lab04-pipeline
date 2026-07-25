@@ -25,7 +25,7 @@ the stable key in the table. Broker compaction is an operational optimization;
 database constraints and upserts provide the durable idempotency guarantee.
 
 ```bash
-docker compose --profile person3 up -d --build
+docker compose --profile spark up -d --build
 docker compose exec -T kafka kafka-topics \
   --bootstrap-server kafka:29092 --list
 
@@ -70,7 +70,7 @@ edge events: 830472
 parser error events: 0
 ```
 
-The zero error count is a successful outcome rather than a missing error topic:
+The error topic exists and its final message count is zero:
 `cpg.errors` existed with the documented one-partition policy, and automated
 schema/parser tests exercise its error payload. All final repository messages
 used schema version `1.0`, UTC `event_time`, repo ID `huggingface/lerobot`, and
