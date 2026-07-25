@@ -6,6 +6,15 @@ sources are discovered and parsed one file at a time, then emitted as versioned
 events. Kafka Connect writes graph topology directly to Neo4j; Spark Structured
 Streaming consumes only source metadata and upserts it into MongoDB.
 
+## Group Information
+
+| Full name | Student ID |
+|---|---|
+| Hồ Hồ Gia Bảo | 23120021 |
+| Nguyễn Thanh Khánh Hà | 23120037 |
+| Huỳnh Đặng Ngọc Hân | 23120042 |
+| Lê Minh Nhật | 23120067 |
+
 ```text
 LeRobot -> Discovery -> Parser Service -> Kafka
                                       |-> nodes/edges -> Neo4j Connector -> Neo4j
