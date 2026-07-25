@@ -187,10 +187,25 @@ The automated sequence report returned:
 The compact raw-evidence transcript is retained in
 `docs/evidence/task6_lerobot_final.md`.
 
-![Five-phase replay acceptance evidence](images/task6-replay-evidence.svg)
+## Captured replay evidence
 
-This figure maps the five saved snapshots to their observed graph and
-checkpoint states and the final 89-check acceptance result.
+![Baseline graph, MongoDB and checkpoint snapshot](images/task6-baseline.png)
+
+Before the source edit, the target contained 58 unique nodes, 60 unique edges,
+one MongoDB document and checkpoint batch 121.
+
+![Modified graph, MongoDB and checkpoint snapshot](images/task6-modified.png)
+
+After adding the replay probe and processing only that file, the content hash
+changed and the graph converged to 81 unique nodes and 88 unique edges. MongoDB
+still contained exactly one current document, while Spark advanced only to the
+new metadata offset.
+
+![Automated Task 6 acceptance report](images/task6-verifier-89-of-89.png)
+
+The final verifier reports `passed: true`, all 89 checks evaluated, no failed
+checks and an empty failure list. Together, these terminal captures provide the
+raw before/after evidence behind the measurement table above.
 
 ## Reflection
 
