@@ -54,6 +54,6 @@ tests/test_parser_contract.py: 6 passed
 Task 1–2 total: 12 passed
 ```
 
-The executed notebook under `notebooks/task1_task2_member1.ipynb` contains the
+The executed parser notebook under `notebooks/task2_parser_evidence.ipynb` contains the
 full discovery sample, event samples, edge distribution and three-run stable-ID
 comparison for the same pinned checkout.

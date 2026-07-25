@@ -6,7 +6,7 @@
 - Parser runtime: Python 3.14 (`ast` standard library)
 
 This record complements the executed notebook
-`notebooks/task1_task2_member1.ipynb`. The notebook contains representative
+`notebooks/task2_parser_evidence.ipynb`. The notebook contains representative
 events and the exact-replay ID comparison; this file retains the compact
 repository-level acceptance totals.
 

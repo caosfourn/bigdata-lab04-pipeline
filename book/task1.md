@@ -95,9 +95,9 @@ showing that the manifest is consumed in deterministic order rather than being
 reported as a hand-entered total.
 
 The executed notebook directly below this chapter asserts the discovery
-acceptance criteria against the committed live-evidence summary. The combined
-notebook following Task 2 records the same pinned checkout together with the
-parser experiment.
+acceptance criteria against the committed live-evidence summary. Task 2 has a
+separate parser-only notebook, so cloning and discovery output is not duplicated
+in the book navigation.
 
 ## Reflection
 

@@ -7,7 +7,7 @@ chapters:
       - file: notebooks/task1_discovery_evidence
   - file: book/task2
     sections:
-      - file: notebooks/task1_task2_member1
+      - file: notebooks/task2_parser_evidence
   - file: book/task3
     sections:
       - file: notebooks/task3_kafka_evidence
