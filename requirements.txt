@@ -2,22 +2,21 @@
 # Lab 04 - Spark Streaming: CPG Pipeline
 # ─────────────────────────────────────────────────────────────────────
 
-# ── Thành viên 1: Parser Service (KHÔNG cần gói ngoài, dùng stdlib) ──
-# ast, hashlib, os, json — đều có sẵn trong Python 3.10+
+# Parser and discovery use only the Python standard library.
 
-# ── Thành viên 2: Kafka Integration ──────────────────────────────────
+# Kafka integration
 kafka-python==3.0.8          # Producer/Admin client; supports Python 3.8–3.14
 jsonschema==4.25.1           # Validate the versioned Kafka JSON contracts
 
-# ── Thành viên 3: MongoDB + Spark ────────────────────────────────────
-pyspark==3.5.1               # Apache Spark (bao gồm Structured Streaming)
+# MongoDB and Spark
+pyspark==3.5.1               # Apache Spark, including Structured Streaming
 pymongo==4.6.3               # MongoDB Python driver
 neo4j==5.20.0                # Neo4j verification queries for Task 6
 
 # ── Notebook & Reporting ──────────────────────────────────────────────
 jupyter==1.0.0               # Jupyter Notebook
-jupyter-book==0.15.1         # Jupyter Book (cho submission)
+jupyter-book==0.15.1         # Build the submission site
 ipykernel==6.29.5            # IPython kernel
 
 # ── Dev Tools ─────────────────────────────────────────────────────────
-python-dotenv==1.0.1         # Quản lý env variables (.env file)
+python-dotenv==1.0.1         # Load environment variables from .env files

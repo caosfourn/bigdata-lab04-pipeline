@@ -1,20 +1,9 @@
-"""
-parser_service.py — Task 2: Incremental CPG Parser Service
+"""Incremental Code Property Graph parser.
 
-Chức năng:
-  - Nhận 1 file .py, parse thành Code Property Graph (CPG).
-  - Trích xuất 4 loại phần tử theo chuẩn CPG:
-      • AST nodes    — mọi nút trong cây cú pháp trừu tượng.
-      • CFG edges    — luồng điều khiển (if/for/while/try/with/return).
-      • DFG edges    — luồng dữ liệu (gán biến → sử dụng biến).
-      • CALL edges   — lời gọi hàm (caller → callee).
-  - Gán Stable ID xác định cho mọi element (đảm bảo idempotency Task 6).
-  - Trả về events theo đúng schema trong schemas.py để Thành viên 2 produce
-    lên Kafka mà không cần sửa đổi thêm.
-
-Ghi chú về thư viện:
-  Sử dụng module `ast` của thư viện chuẩn Python — không cần cài thêm gói.
-  Thích hợp cho môi trường hạn chế, đủ để trích xuất AST/CFG/DFG/CALL.
+The service accepts one Python file, extracts AST nodes plus AST, CFG, DFG, and
+call edges, assigns deterministic identifiers, and returns events that follow
+the shared Kafka schemas. It uses Python's standard-library ``ast`` module and
+requires no parser-specific dependency.
 """
 
 from __future__ import annotations
@@ -50,7 +39,7 @@ SCHEMA_VERSION = "1.0"
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _normalize_relative_path(relative_path: str) -> str:
-    """Chuẩn hoá path thành POSIX form để ID giống nhau trên mọi OS."""
+    """Normalize a relative path to POSIX form for cross-platform IDs."""
     normalized = posixpath.normpath(relative_path.replace("\\", "/"))
     if normalized.startswith("./"):
         normalized = normalized[2:]
@@ -58,7 +47,7 @@ def _normalize_relative_path(relative_path: str) -> str:
 
 
 def _stable_file_id(repo_id: str, relative_path: str) -> str:
-    """ID bền vững của file; không phụ thuộc nội dung file."""
+    """Return a stable file identifier that is independent of file content."""
     normalized_path = _normalize_relative_path(relative_path)
     raw = f"repo={repo_id}\x1fpath={normalized_path}"
     return "file_" + hashlib.sha256(raw.encode("utf-8")).hexdigest()
@@ -73,17 +62,12 @@ def _stable_node_id(
     file_id: str | None = None,
 ) -> str:
     """
-    Tạo Stable ID xác định (deterministic) cho một AST node.
+    Return a deterministic identifier for an AST node occurrence.
 
-    QUAN TRỌNG: ID phải giống nhau mọi lần parse cùng file (nếu code không đổi).
-    Vì vậy KHÔNG dùng id(node) — đó là memory address, thay đổi mỗi lần chạy.
-
-    Structural path (ví dụ ``root.body[0].value``) phân biệt được cả
-    những AST singleton không có line/column như ``Load`` hay ``Add``.
-    Toàn bộ 256 bit hash được giữ lại để tránh cắt ngắn không cần thiết.
-
-    ``structural_path=None`` chỉ là fallback tương thích cho code cũ gọi
-    helper này trực tiếp. Parser luôn truyền structural path thực.
+    A structural path such as ``root.body[0].value`` distinguishes singleton
+    AST objects that have no line or column information. The full SHA-256 hash
+    is retained. ``structural_path=None`` remains as a compatibility fallback;
+    the parser always supplies an actual structural path.
     """
     normalized_path = _normalize_relative_path(relative_path)
     resolved_file_id = file_id or _stable_file_id(repo_id, normalized_path)
@@ -110,8 +94,10 @@ def _stable_edge_id(
     discriminator: str = "",
 ) -> str:
     """
-    Tạo Stable ID xác định cho một edge.
-    Đảm bảo cùng cặp (src, tgt, type) → cùng ID → Neo4j MERGE không tạo duplicate.
+    Return a deterministic edge identifier.
+
+    The same source, target, edge type, and occurrence discriminator produce
+    the same identifier, so Neo4j ``MERGE`` does not create duplicates.
     """
     normalized_path = _normalize_relative_path(relative_path)
     resolved_file_id = file_id or _stable_file_id(repo_id, normalized_path)
@@ -124,12 +110,12 @@ def _stable_edge_id(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# AST VISITOR — thu thập tất cả node IDs trong 1 lần duyệt O(n)
+# AST VISITOR — collect all node IDs in one O(n) traversal
 # ─────────────────────────────────────────────────────────────────────────────
 
 @dataclass(frozen=True)
 class _ASTOccurrence:
-    """Một occurrence trong AST; cùng object singleton có thể có nhiều path."""
+    """One AST occurrence; a singleton object may occur at multiple paths."""
 
     node: ast.AST
     structural_path: str
@@ -139,9 +125,8 @@ class _ASTOccurrence:
 
 class _NodeIDCollector:
     """
-    Bước 1: Duyệt cây AST một lần để xây dựng mapping ast_node → node_id.
-    Kết quả này được tái sử dụng bởi các bước trích xuất edge (CFG/DFG/CALL)
-    mà không cần parse lại hay tính lại hash.
+    Traverse the AST once to build the node ID mappings. Edge extraction reuses
+    these mappings without parsing the source or hashing nodes again.
     """
 
     def __init__(self, relative_path: str, repo_id: str = "", file_id: str | None = None):
@@ -153,7 +138,7 @@ class _NodeIDCollector:
         self._paths_by_object: dict[int, list[str]] = {}
 
     def visit(self, node: ast.AST):
-        """Thu thập theo field/index path thay vì memory identity của AST object."""
+        """Collect occurrences by field/index path instead of object identity."""
         self.occurrences.clear()
         self._path_id_map.clear()
         self._paths_by_object.clear()
@@ -198,7 +183,7 @@ class _NodeIDCollector:
                         self._collect(item, child_path, structural_path, child_scope)
 
     def get_id(self, node: ast.AST, structural_path: str | None = None) -> str:
-        """Tra cứu stable ID của node (đã được tính ở bước đầu)."""
+        """Return the stable ID computed during the initial traversal."""
         if structural_path is not None:
             return self._path_id_map[structural_path]
         paths = self._paths_by_object.get(id(node), [])
@@ -214,7 +199,7 @@ class _NodeIDCollector:
         )
 
     def get_id_by_path(self, structural_path: str) -> str:
-        """Tra cứu ID chính xác của một AST occurrence."""
+        """Return the exact ID of an AST occurrence."""
         return self._path_id_map[structural_path]
 
 
@@ -223,7 +208,7 @@ class _NodeIDCollector:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _extract_name(node: ast.AST) -> str | None:
-    """Lấy tên định danh của node nếu có (hàm, lớp, biến…)."""
+    """Return a function, class, variable, attribute, or argument name."""
     if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
         return node.name                               # type: ignore[attr-defined]
     if isinstance(node, ast.Name):
@@ -238,9 +223,9 @@ def _extract_name(node: ast.AST) -> str | None:
 
 
 def _get_label(node: ast.AST) -> str:
-    """Chọn Neo4j label phù hợp với loại node để query dễ hơn."""
+    """Choose a useful Neo4j label for an AST node."""
     class_name = node.__class__.__name__
-    # Nhóm các node quan trọng thành label riêng
+    # Keep commonly queried node types as dedicated labels.
     important = {
         "FunctionDef", "AsyncFunctionDef",
         "ClassDef",
@@ -256,7 +241,7 @@ def _get_label(node: ast.AST) -> str:
 
 
 def _get_scope(node: ast.AST, parent_map: dict[int, ast.AST]) -> str | None:
-    """Leo lên cây cha để tìm hàm/lớp bao quanh gần nhất."""
+    """Find the nearest enclosing function or class."""
     current = parent_map.get(id(node))
     while current is not None:
         if isinstance(current, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
@@ -271,33 +256,27 @@ def _get_scope(node: ast.AST, parent_map: dict[int, ast.AST]) -> str | None:
 
 class CPGParser:
     """
-    CPGParser xử lý MỘT file Python, trích xuất CPG và trả về:
-      - node_events  : list[dict]  → produce lên TOPIC_NODES
-      - edge_events  : list[dict]  → produce lên TOPIC_EDGES
-      - metadata     : dict        → produce lên TOPIC_METADATA
-      - error_event  : dict | None → produce lên TOPIC_ERRORS (nếu có lỗi)
+    Parse one Python file and return node, edge, metadata, and error events.
 
-    Thiết kế bounded-memory: events được emit theo generator (yield), không
-    tích lũy toàn bộ vào RAM. Phiên bản list-based bên dưới giữ lại để
-    notebook và testing dùng dễ hơn.
+    Extractors yield individual events to keep each stage bounded by one file.
+    ``parse`` materializes the events for tests, notebooks, and publishing.
     """
 
     def __init__(self, absolute_path: str, repo_root: str, repo_id: str | None = None):
         """
         Args:
-            absolute_path: Đường dẫn tuyệt đối đến file .py cần parse.
-            repo_root    : Đường dẫn tuyệt đối đến thư mục gốc của repo đã clone.
-                           Dùng để tính relative_path chuẩn hóa trong mọi event.
-            repo_id      : ID logic cố định của repository. Nên truyền rõ (ví dụ
-                           ``huggingface/lerobot``) khi nhiều máy clone repo vào
-                           các tên thư mục khác nhau. Mặc định là basename repo.
+            absolute_path: Absolute path of the Python file to parse.
+            repo_root    : Absolute path of the cloned repository root.
+            repo_id      : Stable logical repository name. Pass an explicit
+                           value such as ``huggingface/lerobot`` when clones may
+                           use different local directory names.
         """
         self.absolute_path = os.path.abspath(absolute_path)
         self.repo_root = os.path.abspath(repo_root)
         self.repo_id = repo_id if repo_id is not None else (
             os.path.basename(os.path.normpath(self.repo_root)) or "repository"
         )
-        # relative_path là key chính trong mọi event — chuẩn hóa bằng forward slash
+        # Relative paths are shared event keys and always use forward slashes.
         self.relative_path = _normalize_relative_path(
             os.path.relpath(self.absolute_path, self.repo_root)
         )
@@ -308,19 +287,19 @@ class CPGParser:
 
     def parse(self) -> tuple[list, list, dict, dict | None]:
         """
-        Parse file và trả về tuple (nodes, edges, metadata, error_event).
+        Parse the file and return ``(nodes, edges, metadata, error_event)``.
 
         Returns:
-            nodes      : Danh sách node events (cho cpg.nodes topic).
-            edges      : Danh sách edge events (cho cpg.edges topic).
-            metadata   : Metadata event (cho cpg.metadata topic).
-            error_event: Error event (cho cpg.errors topic) hoặc None nếu không có lỗi.
+            nodes      : Node events for ``cpg.nodes``.
+            edges      : Edge events for ``cpg.edges``.
+            metadata   : File event for ``cpg.metadata``.
+            error_event: Event for ``cpg.errors``, or None after a successful parse.
         """
         t_start = time.time()
-        # Parser instance có thể được reuse sau khi file thay đổi/bị xoá.
+        # A parser instance may be reused after its file changes or is deleted.
         self.file_hash = ""
 
-        # Đọc bytes một lần để hash khớp chính xác với payload được parse.
+        # Read once so the content hash matches the parsed bytes exactly.
         try:
             with open(self.absolute_path, "rb") as f:
                 source_bytes = f.read()
@@ -362,7 +341,7 @@ class CPGParser:
             meta = self._empty_metadata(t_start, parse_status="error")
             return [], [], meta, err
 
-        # Xây dựng cấu trúc hỗ trợ: parent map và ID map
+        # Build parent and ID lookup structures.
         parent_map   = self._build_parent_map(tree)
         id_collector = _NodeIDCollector(
             self.relative_path,
@@ -371,7 +350,7 @@ class CPGParser:
         )
         id_collector.visit(tree)
 
-        # Trích xuất 4 thành phần CPG
+        # Extract all CPG components.
         node_events = list(self._extract_ast_nodes(tree, id_collector, parent_map, source_code))
         ast_edges   = list(self._extract_ast_edges(tree, id_collector))
         cfg_edges   = list(self._extract_cfg_edges(tree, id_collector))
@@ -402,7 +381,7 @@ class CPGParser:
     # ── INTERNAL: SUPPORT STRUCTURES ─────────────────────────────────────────
 
     def _build_parent_map(self, tree: ast.AST) -> dict[int, ast.AST]:
-        """Xây dựng mapping child id → parent node để tìm scope."""
+        """Build a child-to-parent map for scope lookup."""
         parent_map: dict[int, ast.AST] = {}
         for node in ast.walk(tree):
             for child in ast.iter_child_nodes(node):
@@ -410,7 +389,7 @@ class CPGParser:
         return parent_map
 
     def _compute_file_hash(self) -> str:
-        """Tính SHA-256 hash của file (dùng cho Task 6 change detection)."""
+        """Compute the SHA-256 content hash used for revision detection."""
         hasher = hashlib.sha256()
         with open(self.absolute_path, "rb") as f:
             for chunk in iter(lambda: f.read(65536), b""):
@@ -418,7 +397,7 @@ class CPGParser:
         return hasher.hexdigest()
 
     def _event_context(self, parse_status: str = "success") -> dict:
-        """Các field bắt buộc dùng chung cho node/edge/error events."""
+        """Return fields shared by node, edge, and error events."""
         return {
             "repo_id": self.repo_id,
             "file_id": self.file_id,
@@ -433,7 +412,7 @@ class CPGParser:
         target_id: str,
         discriminator: str = "",
     ) -> str:
-        """Tạo edge ID với repo/file context của parser hiện tại."""
+        """Create an edge ID in the current repository and file context."""
         return _stable_edge_id(
             self.relative_path,
             edge_type,
@@ -445,7 +424,7 @@ class CPGParser:
         )
 
     def _empty_metadata(self, t_start: float, parse_status: str = "error") -> dict:
-        """Metadata rỗng dùng khi parse thất bại."""
+        """Return an empty metadata record after a parse failure."""
         duration_ms = (time.time() - t_start) * 1000
         size = 0
         try:
@@ -477,13 +456,12 @@ class CPGParser:
         source_code: str,
     ) -> Generator[dict, None, None]:
         """
-        Duyệt toàn bộ cây AST và sinh ra node event cho mỗi node.
-        Label được phân loại chi tiết để Neo4j query thuận tiện hơn.
+        Yield one node event for each AST occurrence.
         """
         source_lines = source_code.splitlines()
 
-        # Duyệt occurrence list để mỗi vị trí structural có ID riêng,
-        # kể cả khi CPython tái sử dụng singleton object cho Load/Add/...
+        # Give each structural occurrence its own ID, including singleton
+        # objects such as Load and Add that CPython may reuse.
         for occurrence in id_col.occurrences:
             node = occurrence.node
             node_id = id_col.get_id_by_path(occurrence.structural_path)
@@ -495,10 +473,10 @@ class CPGParser:
             end_col   = getattr(node, "end_col_offset", None)
             scope = occurrence.scope
 
-            # Lấy đoạn code tương ứng (chỉ 1 dòng, để tránh payload quá lớn)
+            # Keep at most one short source line in each event.
             snippet = None
             if line is not None and 1 <= line <= len(source_lines):
-                snippet = source_lines[line - 1].strip()[:120]  # tối đa 120 ký tự
+                snippet = source_lines[line - 1].strip()[:120]
 
             yield make_node_event(
                 node_id=node_id,
@@ -523,8 +501,7 @@ class CPGParser:
         id_col: _NodeIDCollector,
     ) -> Generator[dict, None, None]:
         """
-        Sinh AST_CHILD edges: mỗi nút cha → các nút con trực tiếp.
-        Đây là bộ xương cơ bản của CPG.
+        Yield an ``AST_CHILD`` edge from each parent to every direct child.
         """
         for occurrence in id_col.occurrences:
             if occurrence.parent_path is None:
@@ -550,17 +527,14 @@ class CPGParser:
         id_col: _NodeIDCollector,
     ) -> Generator[dict, None, None]:
         """
-        Sinh CFG_NEXT edges: luồng điều khiển giữa các câu lệnh.
+        Yield control-flow edges between statements.
 
-        Mô hình hóa:
-          • Trong một block (body/orelse/handlers/finalbody):
-            stmt[i] → CFG_NEXT → stmt[i+1]
-          • Nút điều kiện (If/For/While) → CFG_BRANCH_TRUE → body[0]
-          • Nút điều kiện               → CFG_BRANCH_FALSE → orelse[0] (nếu có)
-          • Try block                   → CFG_EXCEPT → handler statement[0]
+        Sequential statements use ``CFG_NEXT``. Conditional and loop bodies
+        use ``CFG_BRANCH_TRUE`` and ``CFG_BRANCH_FALSE``. Exception handlers
+        are connected with ``CFG_EXCEPT``.
         """
         for node in ast.walk(tree):
-            # ── Sequential CFG trong mọi block ───────────────────────────────
+            # Sequential control flow inside each statement block.
             for block_attr in ("body", "orelse", "handlers", "finalbody", "finally_body"):
                 block: list = getattr(node, block_attr, [])
                 if not isinstance(block, list) or len(block) < 2:
@@ -637,17 +611,13 @@ class CPGParser:
         id_col: _NodeIDCollector,
     ) -> Generator[dict, None, None]:
         """
-        Sinh DFG_USE edges: luồng dữ liệu từ nơi định nghĩa → nơi sử dụng biến.
+        Yield simple intrafile definition-to-use edges.
 
-        Thuật toán (intraprocedural, per-file):
-          1. Quét toàn bộ AST tìm mọi Name node với ctx=Store (định nghĩa).
-          2. Với mỗi biến, tìm các Name node sau đó với ctx=Load (sử dụng).
-          3. Nếu cùng tên biến: sinh cạnh DFG_USE (def_node → use_node).
-
-        Giới hạn: đây là def-use đơn giản, không phân tích scope đầy đủ.
-        Đủ để minh họa DFG theo yêu cầu của Lab.
+        Each ``Name`` with ``Store`` context is matched to later ``Name`` nodes
+        with ``Load`` context and the same identifier. This is a lightweight
+        approximation and does not perform complete scope analysis.
         """
-        # Bước 1: Thu thập tất cả defs và uses theo tên biến
+        # Collect definitions and uses by variable name.
         defs: dict[str, list[ast.Name]] = {}   # varname → [Store nodes]
         uses: dict[str, list[ast.Name]] = {}   # varname → [Load nodes]
 
@@ -659,7 +629,7 @@ class CPGParser:
                 elif isinstance(node.ctx, ast.Load):
                     uses.setdefault(varname, []).append(node)
 
-        # Bước 2: Ghép def → use theo thứ tự dòng (đơn giản nhất, không scope)
+        # Match each definition to later uses in source order.
         for varname, def_nodes in defs.items():
             use_nodes = uses.get(varname, [])
             for def_node in def_nodes:
@@ -667,7 +637,7 @@ class CPGParser:
                 def_id   = id_col.get_id(def_node)
                 for use_node in use_nodes:
                     use_line = getattr(use_node, "lineno", 0)
-                    # Chỉ nối nếu use xuất hiện SAU def (đơn giản hóa DFG)
+                    # A use must appear at or after its definition.
                     if use_line >= def_line:
                         use_id  = id_col.get_id(use_node)
                         edge_id = self._edge_id("DFG_USE", def_id, use_id)
@@ -689,22 +659,19 @@ class CPGParser:
         id_col: _NodeIDCollector,
     ) -> Generator[dict, None, None]:
         """
-        Sinh CALL edges: từ nút Call → nút FunctionDef được gọi (nếu có trong file).
+        Yield call edges for internal and external function calls.
 
-        Thuật toán:
-          1. Xây dựng mapping tên hàm → FunctionDef node (intraprocedural).
-          2. Với mỗi ast.Call node, lấy tên hàm được gọi.
-          3. Nếu tên hàm tồn tại trong mapping → sinh cạnh CALL.
-          4. Nếu không tìm thấy (external call) → sinh cạnh CALL_EXTERNAL.
+        Local function definitions become ``CALL`` targets. Unresolved names
+        use deterministic ``external::<name>`` targets on ``CALL_EXTERNAL``
+        edges.
         """
-        # Bước 1: Xây dựng mapping tên → FunctionDef trong cùng file
+        # Index local function definitions by name.
         func_defs: dict[str, ast.FunctionDef | ast.AsyncFunctionDef] = {}
         for node in ast.walk(tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 func_defs[node.name] = node
 
-        # Bước 2: Precompute mapping node_python_id → enclosing FunctionDef (O(n))
-        # Tránh O(n²) lookup bằng cách duyệt cây 1 lần duy nhất
+        # Build the enclosing-function lookup once in O(n).
         _enclosing: dict[int, ast.FunctionDef | ast.AsyncFunctionDef] = {}
         def _build_enclosing(node: ast.AST, current_func=None):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -722,7 +689,7 @@ class CPGParser:
 
             call_node_id = id_col.get_id(node)
 
-            # Lấy tên hàm được gọi
+            # Resolve the called name when possible.
             callee_name: str | None = None
             if isinstance(node.func, ast.Name):
                 callee_name = node.func.id
@@ -732,11 +699,11 @@ class CPGParser:
             if callee_name is None:
                 continue
 
-            # Tra cứu FunctionDef bao quanh từ precomputed map (O(1))
+            # Read the enclosing function from the precomputed map in O(1).
             caller_func = _enclosing.get(id(node))
 
             if callee_name in func_defs:
-                # Internal call: caller → callee trong cùng file
+                # Internal call from the enclosing function to a local definition.
                 callee_node = func_defs[callee_name]
                 callee_id   = id_col.get_id(callee_node)
                 src_id      = id_col.get_id(caller_func) if caller_func is not None else call_node_id
@@ -761,7 +728,7 @@ class CPGParser:
                     **self._event_context(),
                 )
             else:
-                # External call: chỉ lưu metadata, không có target node
+                # External calls use a deterministic placeholder target.
                 src_id  = id_col.get_id(caller_func) if caller_func is not None else call_node_id
                 target_id = f"external::{callee_name}"
                 edge_id = self._edge_id(
@@ -787,7 +754,7 @@ class CPGParser:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# ENTRY POINT (chạy trực tiếp để kiểm tra)
+# COMMAND-LINE ENTRY POINT
 # ─────────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -804,14 +771,14 @@ if __name__ == "__main__":
     file_path = os.path.abspath(sys.argv[1])
     repo_root = os.path.abspath(sys.argv[2])
 
-    print(f"[Parser] Đang parse: {file_path}")
+    print(f"[Parser] Parsing: {file_path}")
     parser = CPGParser(absolute_path=file_path, repo_root=repo_root)
     nodes, edges, meta, err = parser.parse()
 
     if err:
-        print(f"[Parser] ❌ Lỗi: {err['error_type']} — {err['error_message']}")
+        print(f"[Parser] Error: {err['error_type']} — {err['error_message']}")
     else:
-        print(f"[Parser] ✅ Hoàn tất:")
+        print("[Parser] Complete:")
         print(f"  - Nodes     : {meta['total_nodes']}")
         print(f"  - AST edges : {meta['total_edges']['ast']}")
         print(f"  - CFG edges : {meta['total_edges']['cfg']}")

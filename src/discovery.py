@@ -1,6 +1,6 @@
 """Task 1: deterministic Python source discovery for a cloned repository.
 
-The parser consumes one file at a time, so discovery deliberately returns only
+The parser consumes one file at a time, so discovery returns only
 metadata.  It does not read all source files into memory.  Test/setup/generated
 sources are excluded using explicit, documented rules and the result is sorted
 by POSIX relative path so two runs over the same checkout produce the same

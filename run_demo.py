@@ -45,9 +45,9 @@ print(f"Repo ID: {args.repo_id}")
 print(f"Repo path: {REPO_ROOT}")
 print(f"Clone command: git clone --depth=1 https://github.com/huggingface/lerobot.git lerobot")
 print()
-print(f"Cấu hình lọc:")
-print(f"  Thư mục loại trừ: {sorted(EXCLUDE_DIRS)}")
-print(f"  File loại trừ   : {sorted(EXCLUDE_FILES)}")
+print("Discovery filters:")
+print(f"  Excluded directories: {sorted(EXCLUDE_DIRS)}")
+print(f"  Excluded files      : {sorted(EXCLUDE_FILES)}")
 print()
 
 try:
@@ -60,7 +60,7 @@ if not py_files:
     print(f"ERROR: no parseable Python files found in {REPO_ROOT}", file=sys.stderr)
     raise SystemExit(2)
 
-print(f"✅ Tổng số file Python cốt lõi: {len(py_files)}")
+print(f"Python source files: {len(py_files)}")
 print()
 
 dir_counts = collections.Counter()
@@ -68,18 +68,18 @@ for f in py_files:
     parts = f['relative_path'].replace('\\', '/').split('/')
     dir_counts[parts[0]] += 1
 
-print("Phân bổ theo thư mục top-level:")
+print("Top-level directory distribution:")
 for d, c in dir_counts.most_common():
     bar = '█' * (c // 5)
     print(f"  {d:<30} {c:>4} files  {bar}")
 
 total_size = sum(f['file_size_bytes'] for f in py_files)
-print(f"\nTổng kích thước: {total_size / 1024:.1f} KB")
+print(f"\nTotal size: {total_size / 1024:.1f} KB")
 
 # ─── TASK 2 ───────────────────────────────────────────────────────────────────
 print()
 print("=" * 65)
-print("TASK 2: CPG Parser Service — Demo trên 5 file")
+print("TASK 2: CPG Parser Service — five-file sample")
 print("=" * 65)
 print(f"{'File':<50} {'Nodes':>6} {'AST':>5} {'CFG':>5} {'DFG':>5} {'CALL':>5} {'ms':>7}")
 print('-' * 90)
@@ -126,7 +126,7 @@ edges_ok = all(all_edge_ids[0] == r for r in all_edge_ids)
 print()
 print(f"  Node IDs stable: {'✅ PASS' if nodes_ok else '❌ FAIL'}")
 print(f"  Edge IDs stable: {'✅ PASS' if edges_ok else '❌ FAIL'}")
-print(f"  Idempotency    : {'✅ PASS — Neo4j MERGE không tạo duplicate!' if nodes_ok and edges_ok else '❌ FAIL'}")
+print(f"  Idempotency    : {'PASS — Neo4j MERGE creates no duplicates' if nodes_ok and edges_ok else 'FAIL'}")
 
 # ─── SAMPLE EVENTS ────────────────────────────────────────────────────────────
 print()
