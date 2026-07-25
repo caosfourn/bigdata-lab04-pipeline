@@ -1,8 +1,14 @@
-# Architecture and design rationale
+# System architecture
+
+## Architecture diagram
+
+The diagram below shows the final pipeline used in this lab. We kept the graph
+and metadata paths separate because they have different storage and recovery
+requirements.
 
 ![Incremental CPG streaming architecture](images/architecture.svg)
 
-## Data paths
+## How data moves through the pipeline
 
 | Path | Components | Responsibility |
 |---|---|---|
@@ -12,11 +18,12 @@
 | Revision cleanup | `cpg.metadata` → Kafka Connect → Neo4j | remove older successful graph revision |
 | Failures | `cpg.errors` / connector DLQ → monitoring | separate parser and infrastructure failures |
 
-The Parser Service is the only component that understands Python syntax. Kafka
-is the contract boundary: Neo4j and Spark depend on versioned events instead of
-parser internals. The two database branches can scale and recover independently.
+The parser is the only component that reads Python syntax. After parsing, Kafka
+events become the shared contract for the rest of the pipeline. Neo4j receives
+nodes and edges directly through Kafka Connect, while Spark reads only file
+metadata and writes it to MongoDB.
 
-## Idempotency at every boundary
+## Replay handling
 
 | Boundary | Mechanism | Failure/replay behavior |
 |---|---|---|
@@ -31,7 +38,7 @@ Checkpointing and database idempotency are both required. A consumer can fail
 after a database write but before committing its offset; replaying that record
 must remain safe even though the checkpoint cannot eliminate the retry.
 
-## Ordering and failure decisions
+## Ordering and failures
 
 Kafka does not provide ordering across separate topics. An edge may therefore
 reach Neo4j before a corresponding node. The sink creates an endpoint
@@ -52,7 +59,7 @@ consumer lag zero because cross-topic endpoint ordering may temporarily leave a
 placeholder; UTC producer timestamps and synchronized clocks are deployment
 requirements for comparing different revisions.
 
-## Deployment boundary
+## Local deployment
 
 Docker Compose provides Kafka, Kafka UI, Neo4j, Kafka Connect, MongoDB and the
 Spark job on one reproducible network. Kafka, Neo4j, MongoDB and Spark checkpoint
