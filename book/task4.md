@@ -130,10 +130,31 @@ edges. Those totals again equalled their distinct-ID counts; `SourceFile`
 cardinality remained 490. This explains why the initial full-load totals above
 differ from the final database state without implying duplicates.
 
-![Live Neo4j final query evidence](images/neo4j-live-evidence.svg)
+## Captured Neo4j Browser evidence
 
-The figure reproduces the final Cypher query and its returned cardinalities;
-the initial-to-final delta is exactly the one-file Task 6 modification.
+![Neo4j uniqueness constraints](images/task4-neo4j-constraints.png)
+
+The live `SHOW CONSTRAINTS` result contains unique identities for
+`CPGNode.node_id`, `CPG_EDGE.edge_id` and `SourceFile.file_id`. Neo4j Browser's
+left-side database totals include external-call nodes and dated fixtures;
+repository acceptance therefore uses the filtered queries below.
+
+![LeRobot node count equals its distinct node-ID count](images/task4-neo4j-unique-counts.png)
+
+The repository-scoped query returns 655,388 nodes and 655,388 distinct node
+IDs after the controlled source modification.
+
+![LeRobot edge count equals its distinct edge-ID count](images/task4-neo4j-unique-edge-counts.png)
+
+The corresponding relationship query returns 830,500 edges and 830,500
+distinct edge IDs, providing direct UI evidence that replay did not duplicate
+topology.
+
+![Rendered CPG topology for the modified source file](images/task4-neo4j-graph.png)
+
+Neo4j Browser renders the bounded graph query for
+`src/lerobot/__init__.py`, demonstrating that the persisted records form a
+navigable topology rather than only aggregate counters.
 
 ## Reflection
 
