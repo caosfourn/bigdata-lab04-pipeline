@@ -1,4 +1,3 @@
-lerobot/
 *.pyc
 __pycache__/
 discovered_files.json
