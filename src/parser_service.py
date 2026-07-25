@@ -42,7 +42,6 @@ except ImportError:  # `python src/parser_service.py`
         make_error_event,
     )
 
-SCHEMA_VERSION = "1.0"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -409,13 +408,6 @@ class CPGParser:
                 parent_map[id(child)] = node
         return parent_map
 
-    def _compute_file_hash(self) -> str:
-        """Tính SHA-256 hash của file (dùng cho Task 6 change detection)."""
-        hasher = hashlib.sha256()
-        with open(self.absolute_path, "rb") as f:
-            for chunk in iter(lambda: f.read(65536), b""):
-                hasher.update(chunk)
-        return hasher.hexdigest()
 
     def _event_context(self, parse_status: str = "success") -> dict:
         """Các field bắt buộc dùng chung cho node/edge/error events."""
@@ -613,7 +605,10 @@ class CPGParser:
                     )
 
             # ── Try / Except ──────────────────────────────────────────────────
-            if isinstance(node, (ast.Try,)):
+            _try_types = (ast.Try,)
+            if hasattr(ast, "TryStar"):  # Python 3.11+ except*
+                _try_types = (ast.Try, ast.TryStar)
+            if isinstance(node, _try_types):
                 try_id = id_col.get_id(node)
                 for handler in getattr(node, "handlers", []):
                     h_id    = id_col.get_id(handler)

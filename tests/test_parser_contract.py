@@ -12,10 +12,11 @@ import sys
 import tempfile
 import unittest
 
-from src.parser_service import CPGParser, _stable_file_id
-
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.parser_service import CPGParser, _stable_file_id
 REQUIRED_CONTEXT = {
     "schema_version",
     "event_time",
@@ -38,7 +39,7 @@ class ParserContractTests(unittest.TestCase):
         self.temp_dir.cleanup()
 
     def _write_and_parse(self, source: str, repo_id: str = "example/repo"):
-        self.source_path.write_text(source, encoding="utf-8")
+        self.source_path.write_bytes(source.encode("utf-8"))
         return CPGParser(
             str(self.source_path),
             str(self.repo_root),
@@ -128,7 +129,7 @@ def caller():
             self.assertEqual(metadata["file_id"], event["file_id"])
 
     def test_cli_supports_script_and_module_import_modes(self) -> None:
-        self.source_path.write_text("value = 1\n", encoding="utf-8")
+        self.source_path.write_bytes("value = 1\n".encode("utf-8"))
         env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
         commands = (
             [
@@ -152,7 +153,8 @@ def caller():
                     cwd=PROJECT_ROOT,
                     env=env,
                     capture_output=True,
-                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     check=False,
                 )
                 self.assertEqual(0, result.returncode, result.stderr)

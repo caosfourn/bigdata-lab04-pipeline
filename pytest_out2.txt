@@ -1,0 +1,11 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.7, pytest-9.1.1, pluggy-1.6.0
+rootdir: D:\HuynhHan\Bigdata\bigdata-lab04-pipeline
+configfile: pytest.ini
+plugins: anyio-4.13.0
+collected 20 items
+
+tests\test_kafka_pipeline.py ...............                             [ 75%]
+tests\test_person3.py .....                                              [100%]
+
+============================= 20 passed in 0.18s ==============================
