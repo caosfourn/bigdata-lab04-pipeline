@@ -9,6 +9,7 @@ from src.kafka_publisher import (
     COMMON_REQUIRED_FIELDS,
     CPGKafkaPublisher,
     CollectingProducer,
+    EventContractError,
     message_key,
     validate_event,
 )
@@ -80,6 +81,14 @@ class ParserContractTests(unittest.TestCase):
                 self.assertTrue(event["event_time"].endswith("Z"))
                 validate_event(event, topic)
         self.assertIsNone(error)
+
+    def test_missing_parse_status_is_rejected_as_a_common_contract_error(self) -> None:
+        nodes, _, _, _ = self.parse()
+        invalid = dict(nodes[0])
+        invalid.pop("parse_status")
+
+        with self.assertRaisesRegex(EventContractError, "parse_status"):
+            validate_event(invalid, TOPIC_NODES)
 
     def test_syntax_error_is_a_valid_error_and_metadata_event(self) -> None:
         self.source.write_text("def broken(:\n", encoding="utf-8")
@@ -170,6 +179,31 @@ class InfrastructureContractTests(unittest.TestCase):
         self.assertIn("MERGE (target:CPGNode", edge_query)
         self.assertIn("MERGE (source)-[edge:CPG_EDGE", edge_query)
         self.assertIn("event.parse_status = 'success'", metadata_query)
+        ordering_guard = (
+            "current_file IS NULL OR current_file.file_hash = event.file_hash "
+            "OR datetime(event.event_time) > datetime(current_file.event_time)"
+        )
+        for query in (node_query, edge_query):
+            self.assertIn(
+                "OPTIONAL MATCH (current_file:SourceFile "
+                "{file_id: event.file_id})",
+                query,
+            )
+            # First load, late events from the same revision, and a genuinely
+            # newer revision are accepted.  Older cross-topic events stop
+            # before any graph MERGE.
+            self.assertIn(ordering_guard, query)
+            self.assertLess(query.index(ordering_guard), query.index("MERGE ("))
+
+        metadata_guard = (
+            "file.event_time IS NULL OR "
+            "datetime(event.event_time) >= datetime(file.event_time)"
+        )
+        self.assertIn(metadata_guard, metadata_query)
+        # A stale metadata event must stop before it can roll back SourceFile
+        # or reconcile (delete) graph elements from a newer revision.
+        self.assertLess(metadata_query.index(metadata_guard), metadata_query.index("SET file."))
+        self.assertLess(metadata_query.index(metadata_guard), metadata_query.index("DELETE stale_edge"))
         # ``ON CREATE SET`` is a valid MERGE sub-clause; a standalone CREATE
         # pattern would violate replay idempotency.
         self.assertNotIn(" CREATE (", f" {node_query} {edge_query} ")
