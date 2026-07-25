@@ -52,18 +52,25 @@ docker-compose.yml
 
 ## Chuẩn bị
 
-- Python 3.10+
+- Python 3.14 cho Discovery/Parser/Publisher trên commit LeRobot đã pin
+- Python 3.11 + Java 17 cho CI, Jupyter Book và Spark-specific unit tests
 - Docker Engine/Desktop với Docker Compose
 - Repo được Moodle chỉ định, shallow-clone vào `lerobot/`
 
 ```bash
 git clone --depth=1 https://github.com/huggingface/lerobot.git lerobot
-python -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
+python3.14 -m venv .venv
+.venv/bin/python -m pip install \
+  kafka-python==3.0.8 jsonschema==4.25.1 \
+  neo4j==5.20.0 pymongo==4.6.3
 cp .env.example .env
 ```
 
-Trên Windows, dùng `.venv\Scripts\python` thay cho `.venv/bin/python`.
+LeRobot commit `0d383d09f2051444de211739196a28cc94736861` có cú pháp mà
+Python 3.11 không parse được ở bốn file; full dry-run bằng Python 3.14 xử lý đủ
+490 file với 0 parser error. Spark 3.5.1 chạy trong container `spark-person3`,
+không cài PySpark vào virtualenv Python 3.14. Trên Windows, dùng
+`.venv\Scripts\python` thay cho `.venv/bin/python`.
 
 ## Task 1–2: Discovery và Parser
 
@@ -199,9 +206,23 @@ Với một file thật trong repo Moodle:
 phải có giải thích, command/cell đã chạy, output thật, hình ảnh và reflection.
 
 ```bash
-.venv/bin/jupyter-book build .
+python3.11 -m venv .venv-report
+.venv-report/bin/python -m pip install jupyter-book==0.15.1
+.venv-report/bin/jupyter-book build . --all --warningiserror
 ```
 
-HTML được tạo dưới `_build/html`. Trước khi nộp cần thay placeholder trong
-`_config.yml`, thêm evidence thật cho Task 5–6, cấu hình workflow deploy GitHub
-Pages và kiểm tra URL công khai bằng cửa sổ ẩn danh.
+HTML được tạo dưới `_build/html`. Workflow `.github/workflows/ci.yml` test mọi
+pull request (hoặc feature branch khi chạy `workflow_dispatch`) nhưng chỉ deploy
+Pages sau khi `main` build thành công. Trên GitHub, chủ repository cần chọn một
+lần:
+
+1. **Settings → Pages**.
+2. **Build and deployment → Source → GitHub Actions**.
+3. Merge nhánh hoàn chỉnh vào `main`, push và đợi cả job test lẫn deploy xanh.
+4. Mở `https://caosfourn.github.io/bigdata-lab04-pipeline/` bằng cửa sổ ẩn danh.
+5. Đi qua toàn bộ chapter và kiểm tra hình/output/link.
+
+Moodle chỉ nhận đúng URL gốc Jupyter Book ở bước 4. Không nộp URL repository,
+URL chapter riêng, ZIP, PDF hay Word. Trước khi publish phải kiểm tra số liệu
+LeRobot cuối trong Task 3–6 khớp evidence đã commit và các hình Kafka, Neo4j,
+MongoDB cùng Spark checkpoint hiển thị đúng trong từng chapter.

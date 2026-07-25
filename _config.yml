@@ -9,9 +9,10 @@ exclude_patterns:
   - ".ipynb_checkpoints/**"
   - "runtime/**"
   - "checkpoints/**"
+  - "lerobot/**"
   - "docs/**"
   - "README.md"
-  - "[[]BigData[]] Lab04 - StreamingV0.md"
+  - "*Lab04 - StreamingV0.md"
 execute:
   execute_notebooks: "off"
   timeout: 180
