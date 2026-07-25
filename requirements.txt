@@ -18,6 +18,7 @@ neo4j==5.20.0                # Neo4j verification queries for Task 6
 jupyter==1.0.0               # Jupyter Notebook
 jupyter-book==0.15.1         # Jupyter Book (cho submission)
 ipykernel==6.29.5            # IPython kernel
+sphinxcontrib-mermaid==0.9.2 # Renders {mermaid} diagrams in book/architecture.md
 
 # ── Dev Tools ─────────────────────────────────────────────────────────
 python-dotenv==1.0.1         # Quản lý env variables (.env file)

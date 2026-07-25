@@ -10,6 +10,7 @@ exclude_patterns:
   - "runtime/**"
   - "checkpoints/**"
   - "docs/**"
+  - "lerobot/**"
   - "README.md"
   - "[[]BigData[]] Lab04 - StreamingV0.md"
 execute:
@@ -20,6 +21,9 @@ parse:
     - colon_fence
     - deflist
     - dollarmath
+sphinx:
+  extra_extensions:
+    - sphinxcontrib.mermaid
 repository:
   url: "https://github.com/caosfourn/bigdata-lab04-pipeline"
   branch: main

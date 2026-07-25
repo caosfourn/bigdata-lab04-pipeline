@@ -17,6 +17,7 @@ python -m src.replay_verifier lerobot/lerobot/__init__.py lerobot \
 ```
 
 **Kiến trúc:**
+
 - `run_parser_dryrun()` — dùng `CollectingProducer` (offline, không cần Kafka)
 - `query_neo4j()` — đếm `CPGNode` + `CPG_EDGE` theo `file_id`, detect duplicates
 - `query_mongodb()` — lấy document `_id = file_id`, kiểm tra `document_count = 1`
@@ -27,6 +28,7 @@ python -m src.replay_verifier lerobot/lerobot/__init__.py lerobot \
 ### 2. [`notebooks/task6_member4.ipynb`](file:///d:/GitHub/bigdata-lab04-pipeline/notebooks/task6_member4.ipynb)
 
 13 cells bao gồm:
+
 - Import + config (với fallback nếu lerobot chưa clone)
 - Schema constants từ `src/schemas.py`
 - Parse BEFORE + AFTER modification (dry-run)
@@ -45,6 +47,7 @@ PNG diagram (454 KB) minh họa đầy đủ pipeline.
 ### 4. [`.github/workflows/deploy.yml`](file:///d:/GitHub/bigdata-lab04-pipeline/.github/workflows/deploy.yml)
 
 GitHub Actions workflow tự động deploy Jupyter Book lên GitHub Pages khi push lên `main`:
+
 - Build: `jupyter-book build .` → artifact `_build/html`
 - Deploy: `actions/deploy-pages@v4`
 - URL sẽ là: `https://caosfourn.github.io/bigdata-lab04-pipeline/`
@@ -52,28 +55,32 @@ GitHub Actions workflow tự động deploy Jupyter Book lên GitHub Pages khi p
 ## Files Updated
 
 ### 5. [`_toc.yml`](file:///d:/GitHub/bigdata-lab04-pipeline/_toc.yml)
+
 Thêm `notebooks/task6_member4` dưới `book/task6`
 
 ### 6. [`book/task6.md`](file:///d:/GitHub/bigdata-lab04-pipeline/book/task6.md)
+
 Nâng cấp với: approach table, script usage, file modification details, evidence table, reflection
 
 ### 7. [`book/architecture.md`](file:///d:/GitHub/bigdata-lab04-pipeline/book/architecture.md)
+
 Thêm: component breakdown table, Kafka topic table, idempotency chain, Mermaid diagram
 
 ### 8. [`book/conclusion.md`](file:///d:/GitHub/bigdata-lab04-pipeline/book/conclusion.md)
+
 Rewrite với: tóm tắt 4 thành viên, key design decisions, submission URL
 
 ---
 
 ## Validation Results
 
-| Check | Result |
-|---|---|
-| `python -m compileall src/` | ✅ No errors |
-| `replay_verifier.py` import | ✅ OK |
-| `replay_verifier --phase before --dry-run` | ✅ Runs, saves JSON |
+| Check                                       | Result                                     |
+| ------------------------------------------- | ------------------------------------------ |
+| `python -m compileall src/`                 | ✅ No errors                               |
+| `replay_verifier.py` import                 | ✅ OK                                      |
+| `replay_verifier --phase before --dry-run`  | ✅ Runs, saves JSON                        |
 | `replay_verifier --phase after` (same file) | ✅ Correctly returns FAIL (hash unchanged) |
-| All TOC files present | ✅ 13/13 files found |
+| All TOC files present                       | ✅ 13/13 files found                       |
 
 ---
 
@@ -97,4 +104,3 @@ Rewrite với: tóm tắt 4 thành viên, key design decisions, submission URL
 8. **Chụp screenshot** Neo4j Browser + MongoDB Compass → lưu vào `docs/evidence/`
 9. **Enable GitHub Pages** trong repo Settings → Pages → Source: GitHub Actions
 10. **Push lên main** → workflow `deploy.yml` tự build + deploy
-

@@ -79,3 +79,27 @@ flowchart LR
     style MDB fill:#ccfbf1
     style CP  fill:#f1f5f9
 ```
+
+---
+
+## Reflection
+
+**Approach and reasoning:** the diagram exists to make one design decision
+impossible to miss — `cpg.nodes`/`cpg.edges` go straight from Kafka Connect
+to Neo4j, while only `cpg.metadata` passes through Spark on its way to
+MongoDB. Drawing both a static SVG (for the PDF/print path) and a Mermaid
+diagram (for the live GitHub Pages site) meant this decision is visible
+regardless of how the book is read.
+
+**What worked:** keeping the diagram at the component level (eight boxes,
+four topics) rather than trying to show every field or every consumer group
+kept it legible. Each row in the "Component Breakdown" table maps to exactly
+one box in the diagram, so a reader can cross-reference without guessing.
+
+**What was harder than expected:** representing the idempotency guarantees
+*visually* (MERGE, upsert, checkpoint) without cluttering the flowchart was
+not straightforward — the "Idempotency Chain" text block above was added
+alongside the diagram instead of inside it, since cramming constraint/upsert
+semantics into node labels made the Mermaid diagram unreadable at normal
+zoom. The two are meant to be read together: the diagram for *shape*, the
+chain for *why replays are safe*.
