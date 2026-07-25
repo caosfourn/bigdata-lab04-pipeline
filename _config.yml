@@ -1,9 +1,9 @@
 title: "Lab 04 — Incremental CPG Streaming Pipeline"
-author: "Big Data Lab Team"
 copyright: "2026"
 only_build_toc_files: true
 exclude_patterns:
   - ".venv/**"
+  - ".venv-report/**"
   - ".venv-spark/**"
   - ".pytest_cache/**"
   - ".ipynb_checkpoints/**"
@@ -23,7 +23,7 @@ parse:
     - dollarmath
 repository:
   url: "https://github.com/caosfourn/bigdata-lab04-pipeline"
-  branch: main
+  branch: feat/complete-lab04-submission
 html:
   use_repository_button: true
   use_issues_button: true
