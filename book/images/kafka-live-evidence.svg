@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="650" viewBox="0 0 1400 650" role="img" aria-labelledby="title desc">
+  <title id="title">Live Kafka topics and Neo4j Sink evidence</title>
+  <desc id="desc">Recorded 25 July 2026 from kafka-topics, kafka-get-offsets, Kafka Connect status, and kafka-consumer-groups. All connector lags are zero.</desc>
+  <defs>
+    <style>
+      .title { font: 700 30px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #e2e8f0; }
+      .sub { font: 16px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #94a3b8; }
+      .head { font: 700 17px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #f8fafc; }
+      .mono { font: 16px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #cbd5e1; }
+      .ok { font: 700 16px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #4ade80; }
+      .panel { fill: #111827; stroke: #334155; stroke-width: 2; rx: 14; }
+      .rule { stroke: #334155; stroke-width: 1; }
+    </style>
+  </defs>
+  <rect width="1400" height="650" fill="#020617"/>
+  <text x="55" y="58" class="title">Kafka live verification</text>
+  <text x="55" y="88" class="sub">Recorded from the running Docker stack · 2026-07-25 · no mocked values</text>
+
+  <rect x="45" y="120" width="1310" height="285" class="panel"/>
+  <text x="75" y="158" class="head">TOPIC</text>
+  <text x="430" y="158" class="head">PARTITIONS</text>
+  <text x="620" y="158" class="head">END OFFSETS BY PARTITION</text>
+  <text x="1120" y="158" class="head">POLICY</text>
+  <line x1="70" y1="174" x2="1330" y2="174" class="rule"/>
+
+  <text x="75" y="211" class="mono">cpg.nodes</text>
+  <text x="470" y="211" class="mono">3</text>
+  <text x="620" y="211" class="mono">0:219695 · 1:217952 · 2:218999</text>
+  <text x="1120" y="211" class="mono">compact,delete</text>
+  <text x="75" y="258" class="mono">cpg.edges</text>
+  <text x="470" y="258" class="mono">3</text>
+  <text x="620" y="258" class="mono">0:277086 · 1:277833 · 2:276927</text>
+  <text x="1120" y="258" class="mono">compact,delete</text>
+  <text x="75" y="305" class="mono">cpg.metadata</text>
+  <text x="470" y="305" class="mono">3</text>
+  <text x="620" y="305" class="mono">0:178 · 1:175 · 2:147</text>
+  <text x="1120" y="305" class="mono">compact,delete</text>
+  <text x="75" y="352" class="mono">cpg.errors</text>
+  <text x="470" y="352" class="mono">1</text>
+  <text x="620" y="352" class="mono">0:0</text>
+  <text x="1120" y="352" class="mono">delete</text>
+  <text x="75" y="386" class="sub">Operational DLQ: cpg.neo4j.dlq · partition 0 end offset = 0</text>
+
+  <rect x="45" y="430" width="650" height="170" class="panel"/>
+  <text x="75" y="470" class="head">Kafka Connect REST status</text>
+  <text x="75" y="510" class="mono">connector  cpg-neo4j-sink</text>
+  <text x="75" y="546" class="mono">connector state</text>
+  <text x="285" y="546" class="ok">RUNNING</text>
+  <text x="75" y="578" class="mono">task 0 state</text>
+  <text x="285" y="578" class="ok">RUNNING</text>
+
+  <rect x="720" y="430" width="635" height="170" class="panel"/>
+  <text x="750" y="470" class="head">Consumer group: connect-cpg-neo4j-sink</text>
+  <text x="750" y="510" class="mono">cpg.nodes     3 / 3 partitions</text>
+  <text x="1195" y="510" class="ok">LAG 0</text>
+  <text x="750" y="546" class="mono">cpg.edges     3 / 3 partitions</text>
+  <text x="1195" y="546" class="ok">LAG 0</text>
+  <text x="750" y="582" class="mono">cpg.metadata  3 / 3 partitions</text>
+  <text x="1195" y="582" class="ok">LAG 0</text>
+</svg>

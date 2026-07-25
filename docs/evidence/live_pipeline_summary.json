@@ -1,0 +1,252 @@
+{
+  "schema_version": "1.0",
+  "captured_at": "2026-07-25T03:30:43.726347Z",
+  "provenance": {
+    "repository": "https://github.com/huggingface/lerobot.git",
+    "repo_id": "huggingface/lerobot",
+    "commit": "0d383d09f2051444de211739196a28cc94736861",
+    "source_manifest_files": 490,
+    "parser_runtime": "Python 3.14",
+    "stack": {
+      "kafka_connect": "Confluent Platform 7.8.0",
+      "neo4j": "Neo4j Community 5.26",
+      "neo4j_connector": "5.5.0",
+      "spark": "3.5.1",
+      "mongodb_spark_connector": "10.7.0",
+      "mongodb": "7.0.12"
+    },
+    "evidence_sources": [
+      "Kafka topic descriptions, end offsets and consumer-group lag",
+      "Kafka Connect REST status",
+      "Neo4j Cypher result sets",
+      "MongoDB aggregation results",
+      "Spark checkpoint logs and five read-only verifier snapshots"
+    ],
+    "fixture_documents_retained": 3
+  },
+  "task1": {
+    "repository": "https://github.com/huggingface/lerobot.git",
+    "shallow_clone": true,
+    "commit": "0d383d09f2051444de211739196a28cc94736861",
+    "raw_python_files": 752,
+    "included_python_files": 490,
+    "excluded_python_files": 262,
+    "duplicate_relative_paths": 0,
+    "excluded_pattern_paths_remaining": 0,
+    "first_manifest_entry": {
+      "relative_path": "scripts/ci/extract_task_descriptions.py",
+      "file_size_bytes": 8631,
+      "file_hash": "7d1235a0b11643c68de0b5ae6de60c71c999f08b575ac07c91848abb440f40cb"
+    }
+  },
+  "task3": {
+    "contract": {
+      "schema_version": "1.0",
+      "required_context": [
+        "schema_version",
+        "event_time",
+        "repo_id",
+        "file_id",
+        "file_path",
+        "file_hash",
+        "parse_status"
+      ],
+      "utc_event_time": true,
+      "stable_keys": {
+        "cpg.nodes": "node_id",
+        "cpg.edges": "edge_id",
+        "cpg.metadata": "file_id",
+        "cpg.errors": "file_id"
+      }
+    },
+    "topics": [
+      {
+        "name": "cpg.nodes",
+        "partitions": 3,
+        "cleanup_policy": "compact,delete",
+        "retention_ms": 604800000,
+        "end_offsets": {"0": 219695, "1": 217952, "2": 218999}
+      },
+      {
+        "name": "cpg.edges",
+        "partitions": 3,
+        "cleanup_policy": "compact,delete",
+        "retention_ms": 604800000,
+        "end_offsets": {"0": 277086, "1": 277833, "2": 276927}
+      },
+      {
+        "name": "cpg.metadata",
+        "partitions": 3,
+        "cleanup_policy": "compact,delete",
+        "retention_ms": 2592000000,
+        "end_offsets": {"0": 178, "1": 175, "2": 147}
+      },
+      {
+        "name": "cpg.errors",
+        "partitions": 1,
+        "cleanup_policy": "delete",
+        "retention_ms": 604800000,
+        "end_offsets": {"0": 0}
+      }
+    ],
+    "initial_lerobot_publish": {
+      "metadata_events": 490,
+      "node_events": 655365,
+      "edge_events": 830472,
+      "parser_error_events": 0
+    },
+    "connector": {
+      "name": "cpg-neo4j-sink",
+      "connector_state": "RUNNING",
+      "task_state": "RUNNING",
+      "lag_by_topic": {
+        "cpg.nodes": [0, 0, 0],
+        "cpg.edges": [0, 0, 0],
+        "cpg.metadata": [0, 0, 0]
+      },
+      "dlq_topic": "cpg.neo4j.dlq",
+      "dlq_end_offset": 0
+    }
+  },
+  "task4": {
+    "event_time_guard": {
+      "node_edge_acceptance": "first_load_or_same_hash_or_strictly_newer_event_time",
+      "metadata_acceptance": "non_stale_event_time",
+      "late_old_revision_blocked": true,
+      "same_revision_replay_allowed": true,
+      "neo4j_explain_queries_passed": 3
+    },
+    "initial_full_load": {
+      "source_files": 490,
+      "nodes": 655365,
+      "distinct_node_ids": 655365,
+      "edges": 830472,
+      "distinct_edge_ids": 830472,
+      "duplicate_node_groups": 0,
+      "duplicate_edge_groups": 0,
+      "unresolved_internal_placeholders": 0
+    },
+    "final_post_modification": {
+      "source_files": 490,
+      "nodes": 655388,
+      "distinct_node_ids": 655388,
+      "edges": 830500,
+      "distinct_edge_ids": 830500,
+      "duplicate_node_groups": 0,
+      "duplicate_edge_groups": 0
+    },
+    "target_file": {
+      "file_path": "src/lerobot/__init__.py",
+      "file_id": "file_4bcb0fb8af5f208dad26ab6d584c0d2a8e7c995ea7954b70e1d1976ce286f236",
+      "baseline_nodes": 58,
+      "baseline_edges": 60,
+      "modified_nodes": 81,
+      "modified_edges": 88,
+      "old_hash_absent_after_reconciliation": true
+    }
+  },
+  "task5": {
+    "mongodb": {
+      "lerobot_documents": 490,
+      "distinct_lerobot_file_ids": 490,
+      "duplicate_file_id_groups": 0,
+      "collection_documents": 493,
+      "target_documents": 1,
+      "target_id_equals_file_id": true,
+      "target_hash": "6c0a72b26999ff1fbaa6ba5a6a074f86e7b1e9490320093885335ebaae92f4b7",
+      "target_nodes": 81,
+      "target_edges": {"ast": 80, "cfg": 6, "dfg": 1, "call": 1}
+    },
+    "checkpoint": {
+      "location": "checkpoints/person3-final-docker",
+      "latest_committed_batch": 124,
+      "committed_offsets": {"0": 178, "1": 175, "2": 147},
+      "committed_offset_total": 500,
+      "pending_batches": []
+    },
+    "restart": {
+      "resumed_at_batch": 125,
+      "committed_offsets_equal_available": true,
+      "stream_idle_without_new_data": true,
+      "target_document_unchanged": true,
+      "collection_fingerprint_unchanged": true,
+      "checkpoint_unchanged": true
+    }
+  },
+  "task6": {
+    "target": {
+      "file_path": "src/lerobot/__init__.py",
+      "file_id": "file_4bcb0fb8af5f208dad26ab6d584c0d2a8e7c995ea7954b70e1d1976ce286f236",
+      "baseline_hash": "9de5fe33e0bf693e86e9bf55360942385a504a1baff224577a405ca91ea33838",
+      "modified_hash": "6c0a72b26999ff1fbaa6ba5a6a074f86e7b1e9490320093885335ebaae92f4b7"
+    },
+    "phases": [
+      {
+        "phase": "baseline",
+        "nodes": 58,
+        "distinct_node_ids": 58,
+        "edges": 60,
+        "distinct_edge_ids": 60,
+        "duplicate_node_groups": 0,
+        "duplicate_edge_groups": 0,
+        "mongo_documents": 1,
+        "checkpoint_batch": 121,
+        "committed_offset_total": 497
+      },
+      {
+        "phase": "exact_baseline_replay",
+        "nodes": 58,
+        "distinct_node_ids": 58,
+        "edges": 60,
+        "distinct_edge_ids": 60,
+        "duplicate_node_groups": 0,
+        "duplicate_edge_groups": 0,
+        "mongo_documents": 1,
+        "checkpoint_batch": 122,
+        "committed_offset_total": 498
+      },
+      {
+        "phase": "modified",
+        "nodes": 81,
+        "distinct_node_ids": 81,
+        "edges": 88,
+        "distinct_edge_ids": 88,
+        "duplicate_node_groups": 0,
+        "duplicate_edge_groups": 0,
+        "mongo_documents": 1,
+        "checkpoint_batch": 123,
+        "committed_offset_total": 499
+      },
+      {
+        "phase": "exact_modified_replay",
+        "nodes": 81,
+        "distinct_node_ids": 81,
+        "edges": 88,
+        "distinct_edge_ids": 88,
+        "duplicate_node_groups": 0,
+        "duplicate_edge_groups": 0,
+        "mongo_documents": 1,
+        "checkpoint_batch": 124,
+        "committed_offset_total": 500
+      },
+      {
+        "phase": "idle_spark_restart",
+        "nodes": 81,
+        "distinct_node_ids": 81,
+        "edges": 88,
+        "distinct_edge_ids": 88,
+        "duplicate_node_groups": 0,
+        "duplicate_edge_groups": 0,
+        "mongo_documents": 1,
+        "checkpoint_batch": 124,
+        "committed_offset_total": 500
+      }
+    ],
+    "acceptance_report": {
+      "passed": true,
+      "check_count": 89,
+      "failure_count": 0,
+      "failures": []
+    }
+  }
+}

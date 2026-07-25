@@ -68,5 +68,6 @@ event_time: 2026-07-24T16:42:23.997639Z
 ```
 
 This run proves schema compatibility, MongoDB replace/upsert behavior and
-resume from a persisted checkpoint. The final Jupyter Book still needs dated
-screenshots and a repeat against the Moodle-selected repository.
+resume from a persisted checkpoint at fixture scope. The completed dated
+LeRobot replay and restart are recorded in
+`docs/evidence/task6_lerobot_final.md`.

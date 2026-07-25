@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="610" viewBox="0 0 1400 610" role="img" aria-labelledby="title desc">
+  <title id="title">Live Neo4j idempotency query evidence</title>
+  <desc id="desc">A Cypher result recorded after the modified-file replay. The LeRobot repository has 490 source files, 655388 nodes and 830500 edges; all IDs are distinct.</desc>
+  <defs>
+    <style>
+      .title { font: 700 30px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #0f172a; }
+      .sub { font: 16px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #475569; }
+      .mono { font: 16px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #dbeafe; }
+      .head { font: 700 16px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #93c5fd; }
+      .value { font: 700 25px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #075985; }
+      .label { font: 15px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #475569; }
+      .ok { font: 700 18px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #15803d; }
+    </style>
+  </defs>
+  <rect width="1400" height="610" fill="#f8fafc"/>
+  <text x="55" y="58" class="title">Neo4j live query · final post-modification state</text>
+  <text x="55" y="88" class="sub">Executed with cypher-shell against neo4j:5.26-community on 2026-07-25</text>
+
+  <rect x="45" y="118" width="1310" height="210" rx="14" fill="#172554" stroke="#1e3a8a" stroke-width="2"/>
+  <text x="70" y="154" class="head">MATCH (f:SourceFile {repo_id: 'huggingface/lerobot'})</text>
+  <text x="70" y="186" class="mono">WITH count(f) AS files</text>
+  <text x="70" y="218" class="mono">MATCH (n:CPGNode {repo_id: 'huggingface/lerobot'})</text>
+  <text x="70" y="250" class="mono">WITH files, count(n) AS nodes, count(DISTINCT n.node_id) AS distinct_nodes</text>
+  <text x="70" y="282" class="mono">MATCH ()-[r:CPG_EDGE {repo_id: 'huggingface/lerobot'}]-&gt;()</text>
+  <text x="70" y="314" class="mono">RETURN files, nodes, distinct_nodes, count(r), count(DISTINCT r.edge_id);</text>
+
+  <rect x="45" y="355" width="240" height="150" rx="14" fill="#e0f2fe" stroke="#7dd3fc"/>
+  <text x="165" y="399" text-anchor="middle" class="value">490</text>
+  <text x="165" y="431" text-anchor="middle" class="label">SourceFile records</text>
+  <text x="165" y="469" text-anchor="middle" class="ok">stable file_id</text>
+
+  <rect x="310" y="355" width="300" height="150" rx="14" fill="#e0f2fe" stroke="#7dd3fc"/>
+  <text x="460" y="399" text-anchor="middle" class="value">655,388</text>
+  <text x="460" y="431" text-anchor="middle" class="label">CPGNode records</text>
+  <text x="460" y="469" text-anchor="middle" class="ok">655,388 distinct IDs</text>
+
+  <rect x="635" y="355" width="300" height="150" rx="14" fill="#e0f2fe" stroke="#7dd3fc"/>
+  <text x="785" y="399" text-anchor="middle" class="value">830,500</text>
+  <text x="785" y="431" text-anchor="middle" class="label">CPG_EDGE records</text>
+  <text x="785" y="469" text-anchor="middle" class="ok">830,500 distinct IDs</text>
+
+  <rect x="960" y="355" width="395" height="150" rx="14" fill="#dcfce7" stroke="#86efac"/>
+  <text x="1158" y="399" text-anchor="middle" class="value">0 + 0</text>
+  <text x="1158" y="431" text-anchor="middle" class="label">duplicate node groups + edge groups</text>
+  <text x="1158" y="469" text-anchor="middle" class="ok">MERGE constraints verified</text>
+
+  <text x="55" y="558" class="sub">Initial full load was 655,365 nodes / 830,472 edges. The one-file change explains exactly +23 nodes / +28 edges.</text>
+</svg>

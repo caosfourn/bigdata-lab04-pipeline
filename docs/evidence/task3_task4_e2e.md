@@ -5,8 +5,8 @@ Environment: local Docker Compose, Neo4j Community 5.26, Neo4j Kafka
 Connector 5.5.0, Confluent Kafka/Connect 7.8.0.
 
 This file records the text evidence from the member-2 integration run. The
-Jupyter Book should execute the same commands against the Moodle-selected
-repository and add screenshots from Neo4j Browser.
+final Jupyter Book supplements it with executed cells from the Moodle-selected
+repository and a dated Neo4j query evidence figure.
 
 ## Kafka topic
 
@@ -72,6 +72,6 @@ file, status, expected_nodes, nodes, edges
 "src/schemas.py", "success", 467, 467, 497
 ```
 
-This evidence covers Kafka-to-Neo4j behavior. MongoDB state and Spark
-checkpoint-offset evidence belong to Task 5–6 and must be supplied by members
-3 and 4.
+This evidence covers the earlier fixture-scope Kafka-to-Neo4j run. The completed
+five-phase LeRobot run, including MongoDB and Spark checkpoint state, is recorded
+in `docs/evidence/task6_lerobot_final.md`.
