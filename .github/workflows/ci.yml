@@ -49,7 +49,7 @@ jobs:
         run: python -m pytest -q
 
       - name: Validate Docker Compose
-        run: docker compose --profile person3 config --quiet
+        run: docker compose --profile spark config --quiet
 
       - name: Build Jupyter Book with warnings treated as errors
         run: jupyter-book build . --all --warningiserror
