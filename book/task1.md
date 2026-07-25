@@ -84,6 +84,16 @@ src/lerobot/__init__.py                  1965 bytes
   sha256 9de5fe33e0bf693e86e9bf55360942385a504a1baff224577a405ca91ea33838
 ```
 
+## Captured execution evidence
+
+![Terminal output from the final LeRobot discovery run](images/task1-discovery-terminal.png)
+
+The terminal capture records the real operator command, the selected
+`huggingface/lerobot` repository, the active exclusion policy, and the final
+490-file result. The lower portion also begins the bounded parser demonstration,
+showing that the manifest is consumed in deterministic order rather than being
+reported as a hand-entered total.
+
 The executed notebook directly below this chapter asserts the discovery
 acceptance criteria against the committed live-evidence summary. The combined
 notebook following Task 2 records the same pinned checkout together with the
