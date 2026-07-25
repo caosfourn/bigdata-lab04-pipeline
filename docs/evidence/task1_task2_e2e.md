@@ -1,7 +1,7 @@
 # Task 1–2 — LeRobot discovery and parser evidence
 
-Execution date: 2026-07-25  
-Repository: `https://github.com/huggingface/lerobot.git`  
+Execution date: 2026-07-25
+Repository: `https://github.com/huggingface/lerobot.git`
 Pinned shallow-clone commit: `0d383d09f2051444de211739196a28cc94736861`
 
 ## Repository discovery
