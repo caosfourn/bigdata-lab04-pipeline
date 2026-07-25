@@ -1,62 +1,61 @@
-# Conclusion, limitations, and submission gate
+# Conclusion and reflection
 
-The pipeline separates topology from file metadata while preserving one shared,
-versioned identity contract. The pinned LeRobot checkout produced a deterministic
-490-file source manifest. The selected parser file produced 1,003 unique nodes
-and 1,272 unique AST/CFG/DFG/CALL edges, with identical IDs on exact replay.
-The initial full-load graph contained 655,365 unique nodes and 830,472 unique
-edges. The final five-phase LeRobot replay passed all 89 automated checks and
-verified Neo4j `MERGE`, stale-revision cleanup, MongoDB replace/upsert, and Spark
-checkpoint recovery together.
+We completed the pipeline from Python source discovery to storage in Neo4j and
+MongoDB. The final run used the pinned LeRobot repository and processed all 490
+selected Python files without parser errors.
 
-## What worked
+## Final results
 
-- Parsing one file at a time bounded work and isolated syntax failures.
-- Full deterministic IDs connected Kafka keys, Neo4j constraints and MongoDB
-  `_id` without machine-specific paths.
-- Direct Kafka Connect ingestion kept Spark out of the topology branch.
-- Neo4j and MongoDB remained safe under exact replay.
-- A persistent Spark checkpoint resumed at committed Kafka offsets.
+| Check | Result |
+|---|---:|
+| Discovered Python files | 490 |
+| Parser errors | 0 |
+| Initial Neo4j nodes | 655,365 |
+| Initial Neo4j edges | 830,472 |
+| Final Neo4j nodes after the file change | 655,388 |
+| Final Neo4j edges after the file change | 830,500 |
+| MongoDB documents | 490 |
+| Task 6 checks | 89 / 89 passed |
 
-## Limitations
+Replaying the same input did not increase the number of nodes, edges, or
+MongoDB documents. When we changed one Python file, the file hash and graph
+content changed, but the stable `file_id` still pointed to the same source file.
+This allowed Neo4j to replace the old graph revision and MongoDB to update the
+existing document. Restarting Spark with the same checkpoint also skipped the
+offsets that had already been committed.
 
-The standard-library CFG and DFG are intra-file educational approximations, not
-whole-program alias or type analysis. Kafka does not order records across
-topics, so Neo4j needs endpoint placeholders and a post-lag verification query.
-Fixture integration evidence remains useful for diagnosing individual
-components, but the dated modified-LeRobot-file run is the submission-level
-claim: after the edit the graph converged to 655,388 unique nodes and 830,500
-unique edges, while MongoDB retained 490 unique LeRobot documents.
+## What we learned
 
-## Final report gate
+At first, we expected parsing Python to be the most difficult part. In practice,
+the harder problem was keeping the same identity across Kafka, Neo4j, and
+MongoDB. Stable IDs were needed in every stage; using `MERGE` only at the final
+database would not have been enough.
 
-Before publication, all of these conditions must be true:
+We also learned that a streaming pipeline can temporarily look inconsistent.
+Kafka does not guarantee ordering between separate topics, so an edge can reach
+Neo4j before its node. Placeholder nodes and the final lag check were necessary
+to handle that case. Spark checkpointing solved a different problem: resuming
+from Kafka after the streaming job stopped.
 
-- Task 6's result table contains one coherent LeRobot before/after/replay run.
-- Kafka, Neo4j, MongoDB, and Spark restart evidence figures are embedded in
-  their corresponding chapters.
-- Raw logs/JSON used by the figures remain in the public repository.
-- The executed Task 1 and Task 2 notebooks agree with the current full-ID code
-  and the pinned commit.
-- `jupyter-book build . --all --warningiserror` exits successfully.
-- CI tests and the Pages deployment job are green on the report branch.
-- The public site opens from a signed-out/incognito browser and repository links
-  do not require authentication.
+## Limitations and possible improvements
 
-## Publishing and Moodle submission
+- The CFG and DFG are intrafile approximations. They do not perform complete
+  scope, alias, or type analysis.
+- The parser processes one file at a time, but each file is still materialized
+  as lists of events before publishing. A generator-based publisher would use
+  less memory for very large files.
+- Placeholder nodes are useful for cross-topic ordering, but they make the
+  Neo4j sink queries more complicated.
+- The current deployment runs all services on one Docker host. A larger project
+  would need separate monitoring, resource limits, and backup policies.
 
-Repository administrators must select **Settings → Pages → Build and
-deployment → Source: GitHub Actions** once. Run the workflow manually for the
-report branch. A successful test job builds `_build/html`, and the deploy job
-publishes it to the `github-pages` environment.
+## Final reflection
 
-For this repository, the expected root address is:
+The most useful part of Task 6 was testing both an exact replay and a real file
+change. The exact replay checked duplicate safety, while the modified-file run
+checked whether old state was actually replaced. Those are different cases,
+and testing only one of them would have missed an important pipeline failure.
 
-```text
-https://caosfourn.github.io/bigdata-lab04-pipeline/
-```
-
-Open that exact root URL in an incognito window, navigate through every chapter,
-and then paste only that URL into Moodle. The assignment accepts one public
-Jupyter Book URL; it does not accept a ZIP archive, PDF export, Word document,
-GitHub repository URL, or a link to an individual chapter.
+Overall, the pipeline met the required data flow and replay behavior. The main
+technical compromise is the simplified CFG/DFG analysis, which was acceptable
+for this lab but would need a stronger parser for production use.
