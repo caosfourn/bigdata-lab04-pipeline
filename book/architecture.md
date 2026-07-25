@@ -1,105 +1,67 @@
-# Architecture
+# System architecture
 
-## Pipeline Diagram
+## Architecture diagram
+
+The diagram below shows the final pipeline used in this lab. We kept the graph
+and metadata paths separate because they have different storage and recovery
+requirements.
 
 ![Incremental CPG streaming architecture](images/architecture.svg)
 
-The pipeline processes one Python source file at a time and routes four
-versioned event streams through Apache Kafka to two independent sinks.
+## How data moves through the pipeline
 
----
-
-## Component Breakdown
-
-| Component | Role | Technology |
+| Path | Components | Responsibility |
 |---|---|---|
-| File Discovery | Enumerate `.py` files, compute SHA-256 | `src/discovery.py` |
-| Parser Service | Extract AST/CFG/DFG/CALL, assign stable IDs | `src/parser_service.py` (stdlib `ast`) |
-| Kafka Broker | Durable event bus, topic compaction | Confluent CP-Kafka 7.8 (KRaft) |
-| Kafka Connect | Stream cpg.nodes + cpg.edges directly to Neo4j | Neo4j Connector 5.5 |
-| Neo4j | Persist CPG topology | Neo4j 5.26 Community |
-| Spark Streaming | Consume cpg.metadata, write to MongoDB | Spark 3.5.1 + Mongo Connector 10.7 |
-| MongoDB | Persist file-level metadata | MongoDB 7.0 |
-| Checkpoint | Durable Kafka offset store | Spark checkpoint directory |
+| Discovery | shallow clone → manifest | deterministic list and content hashes |
+| Topology | parser → `cpg.nodes`/`cpg.edges` → Kafka Connect → Neo4j | direct graph persistence; no Spark |
+| File state | parser → `cpg.metadata` → Spark → MongoDB | current metadata document and offset recovery |
+| Revision cleanup | `cpg.metadata` → Kafka Connect → Neo4j | remove older successful graph revision |
+| Failures | `cpg.errors` / connector DLQ → monitoring | separate parser and infrastructure failures |
 
----
+The parser is the only component that reads Python syntax. After parsing, Kafka
+events become the shared contract for the rest of the pipeline. Neo4j receives
+nodes and edges directly through Kafka Connect, while Spark reads only file
+metadata and writes it to MongoDB.
 
-## Kafka Topic Layout
+## Replay handling
 
-| Topic | Key | Partitions | Cleanup | Consumer |
-|---|---|---:|---|---|
-| `cpg.nodes` | `node_id` | 3 | compact + 7-day | Neo4j Sink (direct) |
-| `cpg.edges` | `edge_id` | 3 | compact + 7-day | Neo4j Sink (direct) |
-| `cpg.metadata` | `file_id` | 3 | compact + 30-day | Spark → MongoDB |
-| `cpg.errors` | `file_id` | 1 | 7-day delete | Monitoring / DLQ |
+| Boundary | Mechanism | Failure/replay behavior |
+|---|---|---|
+| Parser | deterministic full SHA-256 IDs | unchanged content emits the same identities |
+| Producer | stable Kafka key, `acks=all`, idempotent producer | a retry keeps the same key |
+| Neo4j | uniqueness constraints and Cypher `MERGE` | at-least-once records update existing elements |
+| Graph revision | stable `file_id`, changing `file_hash`, guarded `event_time` | same revision may replay; late older revision is rejected; successful metadata removes stale graph |
+| MongoDB | `_id = file_id`, replace/upsert | one current document per repo-scoped file |
+| Spark | persistent checkpoint | resumes from committed Kafka offsets |
 
-> **Key design decision:** `cpg.nodes` and `cpg.edges` go **directly** to Neo4j
-> via Kafka Connect (no Spark). Spark is used **only** for `cpg.metadata` →
-> MongoDB. Mixing them up is the most common grading deduction.
+Checkpointing and database idempotency are both required. A consumer can fail
+after a database write but before committing its offset; replaying that record
+must remain safe even though the checkpoint cannot eliminate the retry.
 
----
+## Ordering and failures
 
-## Idempotency Chain
+Kafka does not provide ordering across separate topics. An edge may therefore
+reach Neo4j before a corresponding node. The sink creates an endpoint
+placeholder, then a later node event fills its properties. Verification fails
+if an internal placeholder remains after consumer lag reaches zero.
 
-```
-Parser (stable SHA-256 IDs)
-  → Kafka (log-compaction deduplicates same-keyed messages)
-    → Neo4j MERGE (uniqueness constraint prevents duplicate nodes/edges)
-    → MongoDB replace/upsert (file_id as _id, always 1 document per file)
-    → Spark checkpoint (committed offsets skip already-processed records)
-```
+A parse error is published to `cpg.errors` and metadata carries
+`parse_status=error`. Neo4j deletes an older file revision only after successful
+metadata, so a broken edit cannot erase the last known valid graph. Connector
+conversion/write failures go to `cpg.neo4j.dlq`, which is monitored separately.
 
----
+Node and edge queries accept the first observed file revision, another event
+with the current content hash, or a strictly newer `event_time`. The metadata
+query performs its state update and cleanup only when its event is non-stale.
+This closes the late-old-revision race without assuming a total order across
+topics. Same-revision retries remain idempotent. Verification still waits for
+consumer lag zero because cross-topic endpoint ordering may temporarily leave a
+placeholder; UTC producer timestamps and synchronized clocks are deployment
+requirements for comparing different revisions.
 
-## Mermaid Diagram
+## Local deployment
 
-```{mermaid}
-flowchart LR
-    A["Python Repo\n(lerobot)"] -->|file-at-a-time| B["Parser Service\n(discovery.py → parser_service.py)"]
-
-    B -->|node events| K1["cpg.nodes\nkey: node_id"]
-    B -->|edge events| K2["cpg.edges\nkey: edge_id"]
-    B -->|metadata events| K3["cpg.metadata\nkey: file_id"]
-    B -->|error events| K4["cpg.errors"]
-
-    K1 -->|"NO Spark"| KC["Kafka Connect\nNeo4j Sink 5.5\nMERGE on node_id"]
-    K2 -->|"NO Spark"| KC
-
-    KC --> N4J["Neo4j\nCPGNode · CPG_EDGE\nuniqueness constraint"]
-
-    K3 -->|"via Spark"| SP["Spark Structured\nStreaming\ncheckpoint location"]
-    SP --> MDB["MongoDB\n_id = file_id\nreplace/upsert"]
-    SP -. "durable offsets" .-> CP["Checkpoint\noffsets/N"]
-
-    K4 --> MON["Monitoring\ncpg.neo4j.dlq"]
-
-    style KC fill:#ede9fe
-    style SP fill:#d1fae5
-    style N4J fill:#cffafe
-    style MDB fill:#ccfbf1
-    style CP  fill:#f1f5f9
-```
-
----
-
-## Reflection
-
-**Approach and reasoning:** the diagram exists to make one design decision
-impossible to miss — `cpg.nodes`/`cpg.edges` go straight from Kafka Connect
-to Neo4j, while only `cpg.metadata` passes through Spark on its way to
-MongoDB. Drawing both a static SVG (for the PDF/print path) and a Mermaid
-diagram (for the live GitHub Pages site) meant this decision is visible
-regardless of how the book is read.
-
-**What worked:** keeping the diagram at the component level (eight boxes,
-four topics) rather than trying to show every field or every consumer group
-kept it legible. Each row in the "Component Breakdown" table maps to exactly
-one box in the diagram, so a reader can cross-reference without guessing.
-
-**What was harder than expected:** representing the idempotency guarantees
-*visually* (MERGE, upsert, checkpoint) without cluttering the flowchart was
-not straightforward — the "Idempotency Chain" text block above was added
-alongside the diagram instead of inside it, since cramming constraint/upsert
-semantics into node labels made the Mermaid diagram unreadable at normal
-zoom. The two are meant to be read together: the diagram for *shape*, the
-chain for *why replays are safe*.
+Docker Compose provides Kafka, Kafka UI, Neo4j, Kafka Connect, MongoDB and the
+Spark job on one reproducible network. Kafka, Neo4j, MongoDB and Spark checkpoint
+volumes survive container restarts. Host ports expose only the UIs and client
+interfaces needed for evidence capture and verification.

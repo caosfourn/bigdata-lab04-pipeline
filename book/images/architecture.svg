@@ -54,11 +54,18 @@
   <text x="902" y="226" text-anchor="middle" class="small">MERGE by stable ID</text>
   <path d="M725 131 H770 Q785 131 795 153" class="flow"/>
   <path d="M725 244 H770 Q785 244 795 223" class="flow"/>
+  <path d="M725 414 C760 390 748 270 795 232" class="flow dashed"/>
+  <text x="758" y="346" text-anchor="middle" class="small">successful revision</text>
 
   <rect x="1090" y="145" width="220" height="92" class="box" fill="#cffafe"/>
   <text x="1200" y="183" text-anchor="middle" class="label">Neo4j</text>
   <text x="1200" y="210" text-anchor="middle" class="small">CPGNode · CPG_EDGE</text>
   <path d="M1010 190 H1090" class="flow"/>
+
+  <rect x="1090" y="270" width="220" height="72" class="box" fill="#ffe4e6"/>
+  <text x="1200" y="300" text-anchor="middle" class="label">cpg.neo4j.dlq</text>
+  <text x="1200" y="325" text-anchor="middle" class="small">connector failures</text>
+  <path d="M1010 220 C1048 220 1053 306 1090 306" class="flow dashed"/>
 
   <rect x="795" y="375" width="215" height="110" class="box" fill="#d1fae5"/>
   <text x="902" y="414" text-anchor="middle" class="label">Spark Streaming</text>
@@ -80,6 +87,7 @@
   <text x="1200" y="582" text-anchor="middle" class="label">Monitoring</text>
   <text x="1200" y="608" text-anchor="middle" class="small">errors + connector DLQ</text>
   <path d="M725 589 H1090" class="flow"/>
+  <path d="M1310 306 C1360 306 1360 589 1310 589" class="flow dashed"/>
 
   <text x="700" y="684" text-anchor="middle" class="small">Nodes/edges go directly to Neo4j. Spark is used only for metadata → MongoDB.</text>
 </svg>

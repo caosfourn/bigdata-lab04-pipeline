@@ -171,9 +171,9 @@ services:
       retries: 12
       start_period: 10s
 
-  spark-person3:
+  spark-metadata:
     image: apache/spark:3.5.1-scala2.12-java17-python3-ubuntu
-    profiles: ["person3"]
+    profiles: ["spark"]
     user: "0:0"
     working_dir: /opt/project
     environment:
@@ -203,7 +203,7 @@ services:
       - --mongo-collection
       - metadata
       - --checkpoint-location
-      - /opt/checkpoints/person3-final-docker
+      - /opt/checkpoints/metadata-stream
     depends_on:
       kafka:
         condition: service_healthy

@@ -1,9 +1,11 @@
+lerobot/
 *.pyc
 __pycache__/
 discovered_files.json
 *.egg-info/
 .env
 .venv/
+.venv-report/
 .venv-spark/
 .pytest_cache/
 .ipynb_checkpoints/

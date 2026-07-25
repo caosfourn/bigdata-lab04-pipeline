@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 BOOTSTRAP_SERVER="${KAFKA_BOOTSTRAP_SERVER:-kafka:29092}"
@@ -37,3 +37,4 @@ kafka-topics --bootstrap-server "$BOOTSTRAP_SERVER" --create --if-not-exists \
   --config min.insync.replicas=1
 
 kafka-topics --bootstrap-server "$BOOTSTRAP_SERVER" --list
+

@@ -1,10 +1,6 @@
-"""
-schemas.py — Định nghĩa schema message cho mọi Kafka topic của Parser Service.
+"""Event builders shared by the parser and Kafka publisher.
 
-Được thiết kế để Thành viên 2 (Kafka Producer/Consumer) sử dụng ngay lập tức
-mà không cần biết chi tiết bên trong của Parser Service.
-
-Kafka Topic Layout (khớp với yêu cầu Task 3):
+Kafka topic layout:
   - cpg.nodes      : AST node events
   - cpg.edges      : AST/CFG/DFG/CALL edge events
   - cpg.metadata   : Source file metadata events
@@ -16,7 +12,7 @@ from __future__ import annotations
 import datetime
 
 # ─────────────────────────────────────────────────────────────────────────────
-# KAFKA TOPIC NAMES — Thành viên 2 import từ đây để dùng chung
+# KAFKA TOPIC NAMES
 # ─────────────────────────────────────────────────────────────────────────────
 
 TOPIC_NODES    = "cpg.nodes"
@@ -32,7 +28,7 @@ SCHEMA_VERSION = "1.0"
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _now_iso() -> str:
-    """Trả về timestamp ISO 8601 có timezone, luôn ở UTC."""
+    """Return a timezone-aware ISO 8601 timestamp in UTC."""
     return datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
 
 
@@ -58,20 +54,20 @@ def make_node_event(
     parse_status: str = "success",
 ) -> dict:
     """
-    Tạo một node event hoàn chỉnh để produce lên topic cpg.nodes.
+    Build a complete node event for the ``cpg.nodes`` topic.
 
     Args:
-        node_id       : Stable deterministic ID (xem generate_stable_node_id trong parser_service).
-        file_path     : Đường dẫn tương đối của file nguồn so với repo root.
-        label         : Nhãn Neo4j, ví dụ "AST_Node", "FunctionDef", "ClassDef".
-        node_type     : Tên class AST, ví dụ "FunctionDef", "If", "Call".
-        line_number   : Dòng bắt đầu (1-indexed), None nếu không có.
-        col_offset    : Cột bắt đầu (0-indexed), None nếu không có.
-        end_lineno    : Dòng kết thúc, None nếu không có.
-        end_col_offset: Cột kết thúc, None nếu không có.
-        name          : Tên định danh (hàm, lớp, biến…), None nếu không có.
-        code_snippet  : Đoạn code tương ứng (tùy chọn, dùng cho Neo4j full-text index).
-        scope         : Tên hàm/lớp bao quanh để xác định phạm vi.
+        node_id       : Stable deterministic identifier.
+        file_path     : Source path relative to the repository root.
+        label         : Neo4j label, such as ``FunctionDef`` or ``ClassDef``.
+        node_type     : AST class name, such as ``FunctionDef``, ``If``, or ``Call``.
+        line_number   : One-based starting line, or None when unavailable.
+        col_offset    : Zero-based starting column, or None when unavailable.
+        end_lineno    : Ending line, or None when unavailable.
+        end_col_offset: Ending column, or None when unavailable.
+        name          : Function, class, or variable name when available.
+        code_snippet  : Optional source excerpt for Neo4j search.
+        scope         : Name of the enclosing function or class.
     """
     return {
         "schema_version": SCHEMA_VERSION,
@@ -110,15 +106,15 @@ def make_edge_event(
     parse_status: str = "success",
 ) -> dict:
     """
-    Tạo một edge event hoàn chỉnh để produce lên topic cpg.edges.
+    Build a complete edge event for the ``cpg.edges`` topic.
 
     Args:
-        edge_id    : Stable deterministic ID của cạnh.
-        file_path  : Đường dẫn tương đối của file nguồn.
-        edge_type  : Loại cạnh: "AST_CHILD" | "CFG_NEXT" | "DFG_USE" | "CALL".
-        source_id  : node_id của nút nguồn.
-        target_id  : node_id của nút đích.
-        properties : Metadata bổ sung tuỳ loại edge (tùy chọn).
+        edge_id    : Stable deterministic edge identifier.
+        file_path  : Source path relative to the repository root.
+        edge_type  : ``AST_CHILD``, ``CFG_NEXT``, ``DFG_USE``, or ``CALL``.
+        source_id  : Source node identifier.
+        target_id  : Target node identifier.
+        properties : Optional edge-specific metadata.
     """
     return {
         "schema_version": SCHEMA_VERSION,
@@ -153,20 +149,19 @@ def make_metadata_event(
     parse_status: str = "success",
 ) -> dict:
     """
-    Tạo một metadata event hoàn chỉnh để produce lên topic cpg.metadata.
-    Event này được Thành viên 3 (MongoDB) consume để lưu file-level metadata.
+    Build a complete file event for the ``cpg.metadata`` topic.
 
     Args:
-        file_path        : Đường dẫn tương đối của file nguồn.
-        file_size_bytes  : Kích thước file tính bằng byte.
-        file_hash        : SHA-256 của file (dùng để detect thay đổi cho Task 6).
-        total_nodes      : Tổng số node đã trích xuất.
-        total_ast_edges  : Số cạnh AST_CHILD.
-        total_cfg_edges  : Số cạnh CFG_NEXT.
-        total_dfg_edges  : Số cạnh DFG_USE.
-        total_call_edges : Số cạnh CALL.
-        parser_version   : Thư viện parser đã dùng ("ast-stdlib" / "tree-sitter").
-        parse_duration_ms: Thời gian parse (milliseconds).
+        file_path        : Source path relative to the repository root.
+        file_size_bytes  : File size in bytes.
+        file_hash        : SHA-256 content hash used for revision detection.
+        total_nodes      : Number of extracted nodes.
+        total_ast_edges  : Number of ``AST_CHILD`` edges.
+        total_cfg_edges  : Number of ``CFG_NEXT`` edges.
+        total_dfg_edges  : Number of ``DFG_USE`` edges.
+        total_call_edges : Number of ``CALL`` edges.
+        parser_version   : Parser implementation name.
+        parse_duration_ms: Parse time in milliseconds.
     """
     return {
         "schema_version":    SCHEMA_VERSION,
@@ -202,15 +197,14 @@ def make_error_event(
     parse_status: str = "error",
 ) -> dict:
     """
-    Tạo một error event để produce lên topic cpg.errors.
-    Dùng khi Parser Service gặp SyntaxError, UnicodeDecodeError, v.v.
+    Build an error event for the ``cpg.errors`` topic.
 
     Args:
-        file_path     : Đường dẫn tương đối của file bị lỗi.
-        error_type    : Loại lỗi, ví dụ "SyntaxError", "UnicodeDecodeError".
-        error_message : Nội dung thông báo lỗi đầy đủ.
-        line_number   : Số dòng gây ra lỗi (nếu có).
-        col_offset    : Vị trí cột gây ra lỗi (nếu có).
+        file_path     : Relative path of the file that failed.
+        error_type    : Exception class, such as ``SyntaxError``.
+        error_message : Complete exception message.
+        line_number   : Error line when available.
+        col_offset    : Error column when available.
     """
     return {
         "schema_version": SCHEMA_VERSION,

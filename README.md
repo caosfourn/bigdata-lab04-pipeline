@@ -1,6 +1,7 @@
 # Lab 04 — Incremental CPG Streaming Pipeline
 
-Pipeline xử lý từng file Python và lưu hai nhánh dữ liệu độc lập:
+The pipeline processes one Python file at a time and writes to two independent
+data paths:
 
 ```text
 Python repository → Discovery → Parser Service → Kafka
@@ -13,19 +14,11 @@ Python repository → Discovery → Parser Service → Kafka
                                               └─ cpg.errors → monitoring
 ```
 
-Neo4j nhận topology trực tiếp từ Kafka, không đi qua Spark. Spark chỉ consume
-`cpg.metadata` và dùng checkpoint để tiếp tục từ offset đã xử lý.
+Neo4j receives graph topology directly from Kafka without passing through
+Spark. Spark consumes only `cpg.metadata` and resumes from committed offsets by
+using its checkpoint.
 
-## Phân công
-
-| Thành viên | Phạm vi | Thành phần chính |
-|---|---|---|
-| 1 | Task 1–2 | `discovery.py`, `parser_service.py`, schema event |
-| 2 | Task 3–4 | Kafka topics/publisher, Kafka Connect, Neo4j Sink |
-| 3 | Task 5 | Spark Structured Streaming, MongoDB, checkpoint |
-| 4 | Task 6 + report | replay toàn pipeline, diagram, Jupyter Book/Pages |
-
-## Cấu trúc chính
+## Project layout
 
 ```text
 src/
@@ -50,22 +43,30 @@ tests/
 docker-compose.yml
 ```
 
-## Chuẩn bị
+## Prerequisites
 
-- Python 3.10+
-- Docker Engine/Desktop với Docker Compose
-- Repo được Moodle chỉ định, shallow-clone vào `lerobot/`
+- Python 3.14 for discovery, parsing, and publishing against the pinned LeRobot commit
+- Python 3.11 and Java 17 for CI, Jupyter Book, and Spark-specific tests
+- Docker Engine or Docker Desktop with Docker Compose
+- The repository assigned on Moodle, shallow-cloned into `lerobot/`
 
 ```bash
 git clone --depth=1 https://github.com/huggingface/lerobot.git lerobot
-python -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
+python3.14 -m venv .venv
+.venv/bin/python -m pip install \
+  kafka-python==3.0.8 jsonschema==4.25.1 \
+  neo4j==5.20.0 pymongo==4.6.3
 cp .env.example .env
 ```
 
-Trên Windows, dùng `.venv\Scripts\python` thay cho `.venv/bin/python`.
+Four files in LeRobot commit `0d383d09f2051444de211739196a28cc94736861`
+use syntax that Python 3.11 cannot parse. The full dry run therefore uses
+Python 3.14; it processed all 490 files with no parser errors. Spark 3.5.1 runs
+inside the `spark-metadata` container, so PySpark is not installed in the Python
+3.14 virtual environment. On Windows, use `.venv\Scripts\python` in place of
+`.venv/bin/python`.
 
-## Task 1–2: Discovery và Parser
+## Tasks 1–2: Discovery and parser
 
 ```bash
 .venv/bin/python src/discovery.py lerobot
@@ -74,26 +75,26 @@ Trên Windows, dùng `.venv\Scripts\python` thay cho `.venv/bin/python`.
   lerobot
 ```
 
-Parser tạo ID theo contract sau:
+The parser uses the following identifier contract:
 
-- `file_id`: SHA-256 đầy đủ của `repo_id + normalized relative path`.
+- `file_id`: full SHA-256 of `repo_id + normalized relative path`.
 - `node_id`: `file_id + deterministic AST structural path + node type`.
-- `edge_id`: source/target/type và call-site discriminator khi cần.
+- `edge_id`: source, target, type, and a call-site discriminator when required.
 
-Cách này phân biệt cả AST singleton không có line/column và giữ ID ổn định giữa
-các lần parse cùng nội dung.
+This distinguishes AST singleton occurrences that have no line or column data
+and keeps identifiers stable when unchanged content is parsed again.
 
-## Task 3–4: Kafka và Neo4j Sink
+## Tasks 3–4: Kafka and Neo4j sink
 
-Khởi động Kafka, topic bootstrap, Neo4j, constraints, Kafka Connect, MongoDB và
-đăng ký connector:
+Start Kafka, topic bootstrap, Neo4j, constraints, Kafka Connect, MongoDB, and
+connector registration:
 
 ```bash
 docker compose up -d --build
 docker compose ps
 ```
 
-Publish đúng một file:
+Publish one file:
 
 ```bash
 .venv/bin/python -m src.kafka_publisher lerobot \
@@ -101,7 +102,7 @@ Publish đúng một file:
   --repo-id huggingface/lerobot
 ```
 
-Kiểm tra contract mà không kết nối Kafka:
+Check the event contract without connecting to Kafka:
 
 ```bash
 .venv/bin/python -m src.kafka_publisher lerobot \
@@ -110,7 +111,7 @@ Kiểm tra contract mà không kết nối Kafka:
   --dry-run
 ```
 
-Các topic bắt buộc:
+Required topics:
 
 | Topic | Kafka key | Consumer |
 |---|---|---|
@@ -119,9 +120,10 @@ Các topic bắt buộc:
 | `cpg.metadata` | `file_id` | Spark; Neo4j reconciliation |
 | `cpg.errors` | `file_id` | monitoring |
 
-`cpg.neo4j.dlq` là DLQ vận hành riêng, không trộn với parser errors.
+`cpg.neo4j.dlq` is an operational dead-letter topic and remains separate from
+parser errors.
 
-Kiểm tra connector và graph:
+Check the connector and graph:
 
 ```bash
 curl -fsS http://localhost:8083/connectors/cpg-neo4j-sink/status
@@ -130,78 +132,100 @@ docker compose exec -T neo4j cypher-shell \
 ```
 
 Neo4j Browser: <http://localhost:7474>. Kafka UI: <http://localhost:8080>.
-Thiết kế và checklist evidence chi tiết nằm trong
+The design notes and verification checklist are in
 [`docs/task3_task4.md`](docs/task3_task4.md).
 
 ## Task 5: Spark metadata → MongoDB
 
-Spark job dùng schema `cpg.metadata` đầy đủ, đặt MongoDB `_id = file_id` và ghi
-bằng `replace/upsert`. Một revision mới của cùng file vì vậy cập nhật đúng một
-document thay vì tạo duplicate.
+The Spark job consumes the complete `cpg.metadata` schema, sets MongoDB
+`_id = file_id`, and writes with `replace/upsert`. A new revision of a file
+therefore updates one document instead of creating a duplicate.
 
-Chạy Spark bằng profile Docker:
+Run Spark with the Docker profile:
 
 ```bash
-docker compose --profile person3 up -d spark-person3
-docker compose logs -f spark-person3
+docker compose --profile spark up -d spark-metadata
+docker compose logs -f spark-metadata
 ```
 
-Checkpoint được mount tại `./checkpoints/person3-final-docker`. Không xóa hoặc
-đổi path này khi test resume.
+The checkpoint is mounted at `./checkpoints/metadata-stream`. Keep this
+path unchanged during restart testing.
 
-Kiểm tra MongoDB:
+Check MongoDB:
 
 ```bash
 docker compose exec -T mongodb mongosh cpg --quiet --eval \
   'db.metadata.find({}, {_id:1,file_path:1,file_hash:1,parse_status:1}).toArray()'
 ```
 
-Nghiệm thu resume:
+Restart test:
 
-1. Publish metadata và chờ MongoDB cập nhật.
-2. Dừng `spark-person3`.
-3. Khởi động lại bằng cùng checkpoint, chưa publish message mới.
-4. Xác nhận Spark không xử lý lại offset cũ và MongoDB không tăng document.
-5. Sửa một file, chỉ publish file đó và xác nhận cùng `_id/file_id` được update.
+1. Publish metadata and wait for MongoDB to update.
+2. Stop `spark-metadata`.
+3. Restart it with the same checkpoint without publishing a new message.
+4. Confirm that Spark does not process the committed offset again and the
+   MongoDB document count does not increase.
+5. Edit one file, publish only that file, and confirm that the existing
+   `_id/file_id` document is updated.
 
-Checkpoint bảo vệ Kafka offsets; MongoDB `replace/upsert` bảo vệ trường hợp
-micro-batch được retry.
+The checkpoint protects Kafka offsets. MongoDB `replace/upsert` also handles a
+retried micro-batch safely.
 
-Kết quả integration/restart gần nhất được lưu tại
+The latest integration and restart results are stored in
 [`docs/evidence/task5_spark_mongodb_e2e.md`](docs/evidence/task5_spark_mongodb_e2e.md).
 
 ## Test
 
 ```bash
 .venv/bin/python -m unittest discover -s tests -v
-docker compose --profile person3 config --quiet
+docker compose --profile spark config --quiet
 git diff --check
 ```
 
-Nếu PySpark không có trong environment, Spark-specific unit tests sẽ skip. Cần
-chạy chúng trong environment Spark hoặc container trước khi nghiệm thu Task 5.
+Spark-specific unit tests are skipped when PySpark is unavailable. Run them in
+a Spark environment or container before final Task 5 verification.
 
 ## Task 6: Replay
 
-Với một file thật trong repo Moodle:
+Using one real file from the assigned repository:
 
-1. Publish baseline và lưu `file_id`, `file_hash`, parser totals, Neo4j/Mongo counts.
-2. Sửa đúng một file rồi chỉ publish file đó.
-3. Chờ Neo4j consumer lag về 0 và Spark hoàn thành micro-batch.
-4. Neo4j phải có `count = count(DISTINCT id)` và không còn revision hash cũ.
-5. MongoDB phải có đúng một document `_id = file_id` với hash mới.
-6. Publish lại revision mới: mọi count vẫn giữ nguyên.
-7. Restart Spark bằng checkpoint cũ: không đọc lại offset đã commit.
+1. Publish the baseline and record `file_id`, `file_hash`, parser totals, and
+   Neo4j/MongoDB counts.
+2. Edit exactly one file and publish only that file.
+3. Wait for Neo4j consumer lag to reach zero and for Spark to finish the
+   micro-batch.
+4. In Neo4j, require `count = count(DISTINCT id)` and no remaining records with
+   the previous revision hash.
+5. In MongoDB, require exactly one `_id = file_id` document with the new hash.
+6. Publish the new revision again and confirm that all counts remain unchanged.
+7. Restart Spark with the existing checkpoint and confirm that the committed
+   offset is not read again.
 
-## Jupyter Book và GitHub Pages
+## Jupyter Book and GitHub Pages
 
-`_toc.yml`, `_config.yml` và thư mục `book/` là source của báo cáo. Mỗi chapter
-phải có giải thích, command/cell đã chạy, output thật, hình ảnh và reflection.
+`_toc.yml`, `_config.yml`, and `book/` contain the report sources. Each chapter
+includes the method, executed commands or cells, recorded output, screenshots,
+and reflection.
 
 ```bash
-.venv/bin/jupyter-book build .
+python3.11 -m venv .venv-report
+.venv-report/bin/python -m pip install jupyter-book==0.15.1
+.venv-report/bin/jupyter-book build . --all --warningiserror
 ```
 
-HTML được tạo dưới `_build/html`. Trước khi nộp cần thay placeholder trong
-`_config.yml`, thêm evidence thật cho Task 5–6, cấu hình workflow deploy GitHub
-Pages và kiểm tra URL công khai bằng cửa sổ ẩn danh.
+The generated HTML is written to `_build/html`. The
+`.github/workflows/ci.yml` workflow tests pull requests and manually dispatched
+feature branches. Its Pages job publishes the branch selected for the report.
+Configure the repository once:
+
+1. **Settings → Pages**.
+2. **Build and deployment → Source → GitHub Actions**.
+3. Push the completed merge to `main` and wait for both test and deploy jobs to
+   pass.
+4. Open `https://caosfourn.github.io/bigdata-lab04-pipeline/` in a private window.
+5. Visit every chapter and check its figures, outputs, and links.
+
+Submit the Jupyter Book root URL from step 4 to Moodle. Before submission,
+check that the final LeRobot totals in Tasks 3–6 match the committed run data
+and that the Kafka, Neo4j, MongoDB, and Spark checkpoint screenshots appear in
+their corresponding chapters.

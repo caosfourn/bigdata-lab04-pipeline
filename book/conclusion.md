@@ -1,54 +1,61 @@
-# Conclusion & Team Reflection
+# Conclusion and reflection
 
-## What We Built
+We completed the pipeline from Python source discovery to storage in Neo4j and
+MongoDB. The final run used the pinned LeRobot repository and processed all 490
+selected Python files without parser errors.
 
-This project implements a complete incremental Code Property Graph streaming
-pipeline for the `huggingface/lerobot` repository:
+## Final results
 
-- **Task 1–2 (Member 1):** File discovery and CPG parser service using Python's
-  standard `ast` module. Every element receives a deterministic SHA-256 ID
-  derived from its structural position in the AST — the foundation for
-  idempotency across the entire pipeline.
+| Check | Result |
+|---|---:|
+| Discovered Python files | 490 |
+| Parser errors | 0 |
+| Initial Neo4j nodes | 655,365 |
+| Initial Neo4j edges | 830,472 |
+| Final Neo4j nodes after the file change | 655,388 |
+| Final Neo4j edges after the file change | 830,500 |
+| MongoDB documents | 490 |
+| Task 6 checks | 89 / 89 passed |
 
-- **Task 3–4 (Member 2):** Kafka topic design (4 topics, 3 partitions for
-  nodes/edges/metadata) and Neo4j graph topology ingestion via Kafka Connect
-  Sink 5.5 with `MERGE` semantics and uniqueness constraints.
+Replaying the same input did not increase the number of nodes, edges, or
+MongoDB documents. When we changed one Python file, the file hash and graph
+content changed, but the stable `file_id` still pointed to the same source file.
+This allowed Neo4j to replace the old graph revision and MongoDB to update the
+existing document. Restarting Spark with the same checkpoint also skipped the
+offsets that had already been committed.
 
-- **Task 5 (Member 3):** Spark Structured Streaming job consuming `cpg.metadata`
-  and writing to MongoDB with `replace/upsert` (`_id = file_id`) and a durable
-  checkpoint location.
+## What we learned
 
-- **Task 6 + Diagram (Member 4):** Idempotent replay verification demonstrating
-  that re-processing a modified file updates both databases in-place without
-  creating duplicates, and that Spark's committed offsets correctly skip
-  unchanged files.
+At first, we expected parsing Python to be the most difficult part. In practice,
+the harder problem was keeping the same identity across Kafka, Neo4j, and
+MongoDB. Stable IDs were needed in every stage; using `MERGE` only at the final
+database would not have been enough.
 
-## Key Design Decisions
+We also learned that a streaming pipeline can temporarily look inconsistent.
+Kafka does not guarantee ordering between separate topics, so an edge can reach
+Neo4j before its node. Placeholder nodes and the final lag check were necessary
+to handle that case. Spark checkpointing solved a different problem: resuming
+from Kafka after the streaming job stopped.
 
-1. **No Spark between Kafka and Neo4j.** Graph topology (nodes/edges) flows
-   directly via Kafka Connect. This avoids the operational complexity and
-   latency of a Spark job for the high-volume graph stream.
+## Limitations and possible improvements
 
-2. **Stable IDs from structural paths.** Using `root.body[0].value` as the
-   hash input (not memory address `id(node)`) makes IDs reproducible across
-   runs, machines, and Python versions.
+- The CFG and DFG are intrafile approximations. They do not perform complete
+  scope, alias, or type analysis.
+- The parser processes one file at a time, but each file is still materialized
+  as lists of events before publishing. A generator-based publisher would use
+  less memory for very large files.
+- Placeholder nodes are useful for cross-topic ordering, but they make the
+  Neo4j sink queries more complicated.
+- The current deployment runs all services on one Docker host. A larger project
+  would need separate monitoring, resource limits, and backup policies.
 
-3. **`file_id` as the single stable key.** The same SHA-256 of
-   `repo_id + file_path` is used as Neo4j `file_id` property and MongoDB
-   `_id`. This couples the two sinks without tight runtime coupling.
+## Final reflection
 
-4. **Graceful degradation.** The parser, publisher, and verifier all work
-   without live Kafka/Neo4j/MongoDB, using `CollectingProducer` dry-run.
-   This allowed full testing in CI with no external services.
+The most useful part of Task 6 was testing both an exact replay and a real file
+change. The exact replay checked duplicate safety, while the modified-file run
+checked whether old state was actually replaced. Those are different cases,
+and testing only one of them would have missed an important pipeline failure.
 
-## Submission
-
-The published Jupyter Book URL (replace with actual Pages URL after deploy):
-
-```
-https://caosfourn.github.io/bigdata-lab04-pipeline/
-```
-
-> Before submitting: ensure all evidence placeholders in Task 6 contain
-> real captured values, all database UI screenshots are added to
-> `docs/evidence/`, and the GitHub Pages deployment shows a green status.
+Overall, the pipeline met the required data flow and replay behavior. The main
+technical compromise is the simplified CFG/DFG analysis, which was acceptable
+for this lab but would need a stronger parser for production use.

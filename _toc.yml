@@ -1,15 +1,29 @@
 format: jb-book
 root: book/intro
-chapters:
-  - file: book/architecture
-  - file: book/task1
-  - file: book/task2
-    sections:
-      - file: notebooks/task1_task2_member1
-  - file: book/task3
-  - file: book/task4
-  - file: book/task5
-  - file: book/task6
-    sections:
-      - file: notebooks/task6_member4
-  - file: book/conclusion
+parts:
+  - caption: System Architecture
+    chapters:
+      - file: book/architecture
+  - caption: Pipeline Tasks
+    chapters:
+      - file: book/task1
+        sections:
+          - file: notebooks/task1_discovery_evidence
+      - file: book/task2
+        sections:
+          - file: notebooks/task2_parser_evidence
+      - file: book/task3
+        sections:
+          - file: notebooks/task3_kafka_evidence
+      - file: book/task4
+        sections:
+          - file: notebooks/task4_neo4j_evidence
+      - file: book/task5
+        sections:
+          - file: notebooks/task5_spark_mongodb_evidence
+      - file: book/task6
+        sections:
+          - file: notebooks/task6_replay_evidence
+  - caption: Final Reflection
+    chapters:
+      - file: book/conclusion

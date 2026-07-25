@@ -1,6 +1,6 @@
 """Publish one parsed Python file at a time to the CPG Kafka topics.
 
-The parser deliberately remains independent from a Kafka client.  This module
+The parser remains independent from a Kafka client. This module
 is its delivery adapter: it validates the shared event contract, selects a
 stable Kafka key, and waits for acknowledgements before moving to the next
 file.  Consequently memory remains bounded by one parsed source file.
@@ -47,6 +47,7 @@ COMMON_REQUIRED_FIELDS = frozenset(
         "file_id",
         "file_path",
         "file_hash",
+        "parse_status",
     }
 )
 
@@ -62,7 +63,6 @@ TOPIC_REQUIRED_FIELDS: dict[str, frozenset[str]] = {
             "total_edges",
             "parser_version",
             "parse_duration_ms",
-            "parse_status",
         }
     ),
     TOPIC_ERRORS: frozenset({"error_type", "error_message"}),

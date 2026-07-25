@@ -1,46 +1,106 @@
-# Task 1 — Repository cloning and discovery
+# Task 1 — Repository cloning and file discovery
 
-The assigned repository is cloned shallowly to reduce transfer and storage:
+## Approach and reasoning
+
+The selected repository is shallow-cloned so the experiment has the current
+tree without downloading its full history. The exact commit is recorded before
+parsing; this makes file counts and hashes auditable even if LeRobot changes
+later.
 
 ```bash
 git clone --depth=1 https://github.com/huggingface/lerobot.git lerobot
-python src/discovery.py lerobot
+git -C lerobot rev-parse --is-shallow-repository
+git -C lerobot rev-parse HEAD
+.venv/bin/python src/discovery.py lerobot
 ```
 
-`src/discovery.py` excludes configured test/example directories, setup files,
-generated suffixes, virtual environments and VCS metadata. It records relative
-paths, sizes and SHA-256 hashes in `discovered_files.json`.
+`src/discovery.py` walks the tree without following symlinks and keeps only
+ordinary `.py` source files. It excludes VCS/virtual-environment/build folders,
+test directories and filenames, `setup.py`, generated filename suffixes, and
+files with a conventional generated-code header. Each manifest entry contains
+a normalized relative path, byte size, absolute local path, and streaming
+SHA-256 content hash. Entries are sorted by relative path, so repeated discovery
+over one checkout is deterministic.
 
-Re-run the command against the final Moodle-selected commit and record the
-actual count here; it depends on both the commit and the agreed exclusion
-rules. Do not reuse an output captured from another machine/revision.
+This policy is stricter than the assignment requires—the exclusions are
+optional—but it prevents test and generated sources from dominating the graph.
 
-## Evidence to capture
+## Verification commands
 
-- The shallow clone command and selected Git commit.
-- Discovery command with the final file count.
-- A sample of discovered relative paths and hashes.
+```bash
+# Manifest is non-empty and has no duplicate relative path.
+jq 'length' discovered_files.json
+jq -r '.[].relative_path' discovered_files.json | sort | uniq -d
 
-> ⬜ **Pending:** this chapter still needs the real discovery output (file
-> count, sample paths/hashes, selected commit SHA) from the final
-> Moodle-selected repository/commit, supplied by Member 1. Paste the
-> executed command output below this note before submission.
+# These commands should print no paths.
+jq -r '.[].relative_path' discovered_files.json \
+  | rg '(^|/)(tests?|test_[^/]*|[^/]*_tests?)(/|\.py$)'
+jq -r '.[].relative_path' discovered_files.json \
+  | rg '(^|/)(setup|conftest)\.py$|(_gen|_generated|_pb2|_pb2_grpc)\.py$'
+```
+
+The automated discovery tests also create a temporary repository containing
+normal, setup, test and generated files. They assert the same filtering rules,
+sorted output, stable hashes, and a clear non-zero exit for a missing path.
+
+```bash
+.venv/bin/python -m unittest tests.test_discovery -v
+```
+
+## Final LeRobot evidence
+
+Execution date: **2026-07-25**. The final manifest was produced from this pinned
+checkout:
+
+```text
+origin: https://github.com/huggingface/lerobot.git
+is shallow repository: true
+commit: 0d383d09f2051444de211739196a28cc94736861
+raw .py files before exclusions: 752
+included Python source files: 490
+duplicate relative paths: 0
+excluded-pattern paths remaining: 0
+```
+
+| Measurement | Final value |
+|---|---|
+| Repository | `huggingface/lerobot` |
+| Shallow clone | `true` |
+| Pinned source commit | `0d383d09f2051444de211739196a28cc94736861` |
+| Raw `.py` files | 752 |
+| Included Python files | 490 |
+| Excluded files | 262 |
+| Duplicate manifest paths | 0 |
+| Excluded-pattern paths found | 0 |
+
+The first three deterministic manifest entries were:
+
+```text
+scripts/ci/extract_task_descriptions.py  8631 bytes
+  sha256 7d1235a0b11643c68de0b5ae6de60c71c999f08b575ac07c91848abb440f40cb
+scripts/ci/parse_eval_metrics.py         4969 bytes
+  sha256 aa1b7cf39c277000e171802dfca5f251b9158bf029d89c57170161b4b2cf12b8
+src/lerobot/__init__.py                  1965 bytes
+  sha256 9de5fe33e0bf693e86e9bf55360942385a504a1baff224577a405ca91ea33838
+```
+
+## Captured execution evidence
+
+![Terminal output from the final LeRobot discovery run](images/task1-discovery-terminal.png)
+
+The run found 490 files after applying the displayed exclusions to the pinned
+`huggingface/lerobot` checkout. The first parser rows at the bottom use the same
+sorted manifest.
+
+The notebook below checks the discovery counts against the saved run summary.
+Parser output is kept in the separate Task 2 notebook.
 
 ## Reflection
 
-**Approach and reasoning:** excluding tests, examples, and generated
-directories keeps the resulting graph focused on production code, which is
-what the CPG parser and downstream idempotency checks care about. Content
-hashes (SHA-256 per file) give the incremental runner a cheap way to decide
-"unchanged" without re-parsing, which matters once the pipeline scales past
-a single file.
-
-**What worked:** a shallow clone (`--depth=1`) is sufficient because the
-pipeline only ever needs the current file tree, not history — this avoided
-downloading the full `lerobot` history for a repository with a large commit
-log.
-
-**What to watch for:** discovery output is commit-specific. Reusing a count
-or hash sample captured on a different commit (or a different exclusion
-list) than the one graded would make this chapter's numbers unverifiable —
-hence the pending-evidence note above rather than an invented figure.
+The first implementation filtered test directories but could still admit files
+named `test_*.py` or `*_test.py` outside those directories, and a missing repo
+could lead to an empty manifest followed by an unrelated demo failure. The
+discovery boundary now filters both path components and filenames and validates
+the repository path before walking it. Sorting and content hashes made the
+manifest repeatable across runs; the unavoidable trade-off is that changing the
+pinned upstream commit legitimately changes the count and must be documented.

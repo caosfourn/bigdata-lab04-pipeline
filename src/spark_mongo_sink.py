@@ -1,4 +1,4 @@
-"""Helpers for Person 3: Spark Structured Streaming -> MongoDB sink."""
+"""Spark Structured Streaming to MongoDB sink helpers."""
 
 from __future__ import annotations
 

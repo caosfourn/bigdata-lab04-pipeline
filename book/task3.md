@@ -1,37 +1,45 @@
 # Task 3 — Kafka topic design
 
-The event contract defines four independent domain topics:
+## Approach and reasoning
 
-| Topic | Stable message key | Content |
-|---|---|---|
-| `cpg.nodes` | `node_id` | AST node events |
-| `cpg.edges` | `edge_id` | AST, CFG, DFG and call edges |
-| `cpg.metadata` | `file_id` | Current source-file metadata |
-| `cpg.errors` | `file_id` | Parser failures |
+The event contract separates graph topology, file state, and failures so each
+consumer subscribes only to the data it owns. JSON Schema files in
+`config/schemas/` version the payloads independently of broker configuration.
 
-`cpg.neo4j.dlq` is a separate operational topic for Kafka Connect failures.
-Every domain event contains `schema_version`, UTC `event_time`, `repo_id`,
-`file_id`, `file_path`, `file_hash` and `parse_status`.
+| Topic | Stable Kafka key | Partitions | Cleanup / retention | Consumer |
+|---|---|---:|---|---|
+| `cpg.nodes` | `node_id` | 3 | compact + delete / 7 days | Neo4j Sink |
+| `cpg.edges` | `edge_id` | 3 | compact + delete / 7 days | Neo4j Sink |
+| `cpg.metadata` | `file_id` | 3 | compact + delete / 30 days | Spark and reconciliation |
+| `cpg.errors` | `file_id` | 1 | delete / 7 days | monitoring |
+| `cpg.neo4j.dlq` | connector record key | 1 | delete / 14 days | connector operations |
 
-Create topics and publish one file:
+The fifth topic is not a parser output: it is the Kafka Connect dead-letter
+queue. Keeping it separate prevents connector failures from being interpreted
+as domain-level parser errors.
+
+Every domain payload includes `schema_version`, UTC `event_time`, `repo_id`,
+`file_id`, `file_path`, `file_hash`, and `parse_status`. The producer validates
+the payload before sending it with `acks=all`, Kafka idempotent delivery, and
+the stable key in the table. Broker compaction is an operational optimization;
+database constraints and upserts provide the durable idempotency guarantee.
 
 ```bash
-docker compose up -d --build
-python -m src.kafka_publisher lerobot \
+docker compose --profile spark up -d --build
+docker compose exec -T kafka kafka-topics \
+  --bootstrap-server kafka:29092 --list
+
+.venv/bin/python -m src.kafka_publisher lerobot \
   src/lerobot/__init__.py \
   --repo-id huggingface/lerobot
 ```
 
-The producer uses `acks=all`, idempotent delivery and stable keys. Kafka log
-compaction reduces old exact duplicates; downstream IDs and database upserts
-are the actual replay-idempotency mechanism.
+## Recorded integration evidence — fixture scope
 
-## Executed Evidence (member-2 integration run, 2026-07-21)
-
-Environment: local Docker Compose, Confluent Kafka/Connect 7.8.0.
-Full log in [`docs/evidence/task3_task4_e2e.md`](https://github.com/caosfourn/bigdata-lab04-pipeline/blob/main/docs/evidence/task3_task4_e2e.md) (excluded from the built book — see the repo directly).
-
-Broker-reported configuration for `cpg.nodes`:
+Execution date: **2026-07-21**. Environment: Confluent Kafka 7.8.0 and the
+project Docker Compose stack. The broker returned the following for
+`cpg.nodes`; the bootstrap script applies the documented policy to all four
+domain topics.
 
 ```text
 PartitionCount: 3
@@ -40,29 +48,79 @@ cleanup.policy=compact,delete
 retention.ms=604800000
 ```
 
-The bootstrap script (`infra/kafka/create-topics.sh`) applied this to all
-four domain topics and created the separate `cpg.neo4j.dlq` operational
-topic, which stayed at end offset `0` for the whole integration run.
+The connector DLQ was empty after the run:
 
-### Screenshots to attach (pending)
+```text
+cpg.neo4j.dlq:0:0
+```
 
-| Evidence | File to add | Status |
-|---|---|---|
-| Kafka UI — topic list (4 domain + DLQ) | `docs/evidence/kafka_ui_topics.png` | ⬜ not yet captured |
-| Kafka UI — one sample message per topic (key, schema_version, timestamp) | `docs/evidence/kafka_ui_sample_messages.png` | ⬜ not yet captured |
+This is implementation evidence, not a claim that final LeRobot messages were
+captured on that date. The complete raw record remains in
+`docs/evidence/task3_task4_e2e.md`.
+
+## Final LeRobot evidence
+
+Execution date: **2026-07-25**. Publishing the 490-file manifest from pinned
+commit `0d383d09f2051444de211739196a28cc94736861` produced:
+
+```text
+files / metadata events: 490
+node events: 655365
+edge events: 830472
+parser error events: 0
+```
+
+The error topic exists and its final message count is zero:
+`cpg.errors` existed with the documented one-partition policy, and automated
+schema/parser tests exercise its error payload. All final repository messages
+used schema version `1.0`, UTC `event_time`, repo ID `huggingface/lerobot`, and
+stable entity keys. The final broker topic listing contained all four domain
+topics and the operational DLQ; the connector DLQ remained empty after ingestion:
+
+```text
+cpg.neo4j.dlq:0:0
+```
+
+The final connector consumer check showed lag `0` for every partition of
+`cpg.nodes`, `cpg.edges`, and `cpg.metadata` before database evidence was read.
+
+## Captured UI and service evidence
+
+![Kafka UI topic layout](images/task3-kafka-topics.png)
+
+Kafka UI shows the four required domain topics, their partition counts and
+replication factor, plus the separate Neo4j DLQ. The retained log was empty at
+the instant this overview was captured; an exact replay was then published to
+produce the real metadata record shown next.
+
+![Kafka metadata event produced by the exact replay](images/task3-kafka-metadata-message.png)
+
+The Kafka UI message view exposes the actual versioned payload. It includes
+`schema_version`, UTC `event_time`, stable `file_id`, normalized `file_path`,
+content hash, parse status, node total and per-type edge totals.
+
+![Neo4j Kafka Sink connector and task in RUNNING state](images/task3-connector-running.png)
+
+The Kafka Connect REST response confirms that both the sink connector and its
+task were `RUNNING` on worker `connect:8083` during evidence capture.
+
+Useful terminal checks:
+
+```bash
+docker compose exec -T kafka kafka-topics \
+  --bootstrap-server kafka:29092 --describe --topic cpg.metadata
+docker compose exec -T kafka kafka-console-consumer \
+  --bootstrap-server kafka:29092 --topic cpg.metadata \
+  --from-beginning --max-messages 1 \
+  --property print.key=true --property key.separator=' | '
+```
 
 ## Reflection
 
-**What worked:** separate topics let Neo4j (via Connect) and Spark consume
-only their own contract, so a schema change to `cpg.metadata` cannot break
-graph ingestion. Keeping the connector DLQ (`cpg.neo4j.dlq`) separate from
-parser-level errors (`cpg.errors`) meant the team could tell infrastructure
-failures (bad connector config) apart from legitimate domain events (a file
-that failed to parse) — the DLQ staying at offset `0` throughout the run was
-itself useful evidence that no message ever failed delivery to Neo4j.
-
-**What to still verify:** partition count and retention were checked once
-against the local environment; they must be re-confirmed after the final
-`docker compose up -d --build` against the Moodle-selected repository before
-submission, since topic auto-creation defaults can silently override the
-bootstrap script if it is skipped.
+A single mixed topic would couple graph and metadata consumers and make error
+handling ambiguous. Separate topics and shared context fields resolved that
+coupling. Kafka's at-least-once behavior still permits retries, so producer
+idempotence and log compaction alone were not treated as sufficient; stable
+keys are carried through to `MERGE` and replace/upsert operations downstream.
+The separate DLQ also made a clean connector run measurable as an offset of
+zero instead of silently dropping bad records.
