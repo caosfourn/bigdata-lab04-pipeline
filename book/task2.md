@@ -101,6 +101,15 @@ parser errors: 0
 | Full manifest files / errors | 490 / 0 |
 | Full manifest nodes / edges | 655365 / 830472 |
 
+## Captured execution evidence
+
+![Parser edge totals and stable-ID replay test](images/task2-parser-stable-id.png)
+
+This unedited terminal capture shows AST, CFG, DFG and call-edge totals for the
+five-file demonstration. Parsing the representative file three times produced
+the same 1,003 nodes and 1,272 edges on every run; both node and edge identity
+checks ended in `PASS`.
+
 The compact repository-level record is retained at
 `docs/evidence/task1_task2_lerobot_final.md`; the executed notebook below shows
 the representative payloads and calculations.
