@@ -1,9 +1,11 @@
-"""
-Script tạo ra output thực tế của Task 1 & Task 2.
-Kết quả được dùng để điền vào notebook (nếu Jupyter chưa cài).
-"""
-import sys, os, json
+"""Generate reproducible Task 1 and Task 2 evidence for a cloned repository."""
+
+import argparse
+import collections
+import json
+import os
 from pathlib import Path
+import sys
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -17,14 +19,30 @@ sys.path.insert(0, str(PROJECT_ROOT / 'src'))
 from discovery import discover_python_files, EXCLUDE_DIRS, EXCLUDE_FILES
 from parser_service import CPGParser
 
-SAMPLE_REPO = PROJECT_ROOT / 'lerobot'
-REPO_ROOT = SAMPLE_REPO.resolve()
+argument_parser = argparse.ArgumentParser(
+    description="Run file discovery and a five-file CPG parser demonstration."
+)
+argument_parser.add_argument(
+    "repo_path",
+    nargs="?",
+    default=str(PROJECT_ROOT / "lerobot"),
+    help="cloned repository root (default: <project>/lerobot)",
+)
+argument_parser.add_argument(
+    "--repo-id",
+    default="huggingface/lerobot",
+    help="stable logical repository ID used by parser events",
+)
+args = argument_parser.parse_args()
+
+REPO_ROOT = Path(args.repo_path).expanduser().resolve()
 
 # ─── TASK 1 ───────────────────────────────────────────────────────────────────
 print("=" * 65)
 print("TASK 1: Repository Cloning & File Discovery")
 print("=" * 65)
-print(f"Repo: huggingface/lerobot")
+print(f"Repo ID: {args.repo_id}")
+print(f"Repo path: {REPO_ROOT}")
 print(f"Clone command: git clone --depth=1 https://github.com/huggingface/lerobot.git lerobot")
 print()
 print(f"Cấu hình lọc:")
@@ -32,11 +50,19 @@ print(f"  Thư mục loại trừ: {sorted(EXCLUDE_DIRS)}")
 print(f"  File loại trừ   : {sorted(EXCLUDE_FILES)}")
 print()
 
-py_files = discover_python_files(REPO_ROOT)
+try:
+    py_files = discover_python_files(REPO_ROOT)
+except (FileNotFoundError, NotADirectoryError, PermissionError) as error:
+    print(f"ERROR: {error}", file=sys.stderr)
+    raise SystemExit(2) from None
+
+if not py_files:
+    print(f"ERROR: no parseable Python files found in {REPO_ROOT}", file=sys.stderr)
+    raise SystemExit(2)
+
 print(f"✅ Tổng số file Python cốt lõi: {len(py_files)}")
 print()
 
-import collections
 dir_counts = collections.Counter()
 for f in py_files:
     parts = f['relative_path'].replace('\\', '/').split('/')
@@ -59,10 +85,12 @@ print(f"{'File':<50} {'Nodes':>6} {'AST':>5} {'CFG':>5} {'DFG':>5} {'CALL':>5} {
 print('-' * 90)
 
 interesting_files = [f for f in py_files if f['file_size_bytes'] > 1000][:5]
+if not interesting_files:
+    interesting_files = py_files[:5]
 totals = {'nodes': 0, 'ast': 0, 'cfg': 0, 'dfg': 0, 'call': 0}
 
 for fi in interesting_files:
-    parser = CPGParser(fi['absolute_path'], REPO_ROOT)
+    parser = CPGParser(fi['absolute_path'], REPO_ROOT, repo_id=args.repo_id)
     nodes, edges, meta, err = parser.parse()
     if err:
         print(f"{fi['relative_path']:<50}  ERROR: {err['error_type']}")
@@ -87,7 +115,7 @@ test_file = interesting_files[0]['absolute_path']
 all_node_ids, all_edge_ids = [], []
 
 for i in range(3):
-    p = CPGParser(test_file, REPO_ROOT)
+    p = CPGParser(test_file, REPO_ROOT, repo_id=args.repo_id)
     n, e, m, _ = p.parse()
     all_node_ids.append(sorted([x['node_id'] for x in n]))
     all_edge_ids.append(sorted([x['edge_id'] for x in e]))
@@ -105,7 +133,7 @@ print()
 print("=" * 65)
 print("SAMPLE KAFKA EVENTS")
 print("=" * 65)
-parser = CPGParser(test_file, REPO_ROOT)
+parser = CPGParser(test_file, REPO_ROOT, repo_id=args.repo_id)
 nodes, edges, metadata, _ = parser.parse()
 
 func_nodes = [n for n in nodes if n['properties']['type'] == 'FunctionDef']
