@@ -10,4 +10,6 @@ chapters:
   - file: book/task4
   - file: book/task5
   - file: book/task6
+    sections:
+      - file: notebooks/task6_member4
   - file: book/conclusion
