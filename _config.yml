@@ -23,7 +23,7 @@ parse:
     - dollarmath
 repository:
   url: "https://github.com/caosfourn/bigdata-lab04-pipeline"
-  branch: feat/complete-lab04-submission
+  branch: main
 html:
   use_repository_button: true
   use_issues_button: true

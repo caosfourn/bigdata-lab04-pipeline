@@ -220,8 +220,8 @@ Configure the repository once:
 
 1. **Settings → Pages**.
 2. **Build and deployment → Source → GitHub Actions**.
-3. Run the workflow for the report branch and wait for both test and deploy
-   jobs to pass.
+3. Push the completed merge to `main` and wait for both test and deploy jobs to
+   pass.
 4. Open `https://caosfourn.github.io/bigdata-lab04-pipeline/` in a private window.
 5. Visit every chapter and check its figures, outputs, and links.
 

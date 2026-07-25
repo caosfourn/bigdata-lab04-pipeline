@@ -2,7 +2,7 @@ name: Test pipeline and publish Jupyter Book
 
 on:
   push:
-    branches: [feat/complete-lab04-submission]
+    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -54,19 +54,19 @@ jobs:
       - name: Build Jupyter Book with warnings treated as errors
         run: jupyter-book build . --all --warningiserror
 
-      # Publish only from the reviewed submission branch; pull requests remain test-only.
+      # Publish only from main; pull requests remain test-only.
       - name: Configure GitHub Pages
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/feat/complete-lab04-submission'
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         uses: actions/configure-pages@v6
 
       - name: Upload GitHub Pages artifact
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/feat/complete-lab04-submission'
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v5
         with:
           path: _build/html
 
   deploy:
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/feat/complete-lab04-submission'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: build-and-test
     runs-on: ubuntu-latest
     permissions:
