@@ -84,10 +84,25 @@ cpg.neo4j.dlq:0:0
 The final connector consumer check showed lag `0` for every partition of
 `cpg.nodes`, `cpg.edges`, and `cpg.metadata` before database evidence was read.
 
-![Live Kafka topic, connector and consumer-lag evidence](images/kafka-live-evidence.svg)
+## Captured UI and service evidence
 
-The figure is rendered from the recorded topic descriptions, end offsets,
-Kafka Connect REST status and consumer-group output from the final stack.
+![Kafka UI topic layout](images/task3-kafka-topics.png)
+
+Kafka UI shows the four required domain topics, their partition counts and
+replication factor, plus the separate Neo4j DLQ. The retained log was empty at
+the instant this overview was captured; an exact replay was then published to
+produce the real metadata record shown next.
+
+![Kafka metadata event produced by the exact replay](images/task3-kafka-metadata-message.png)
+
+The Kafka UI message view exposes the actual versioned payload. It includes
+`schema_version`, UTC `event_time`, stable `file_id`, normalized `file_path`,
+content hash, parse status, node total and per-type edge totals.
+
+![Neo4j Kafka Sink connector and task in RUNNING state](images/task3-connector-running.png)
+
+The Kafka Connect REST response confirms that both the sink connector and its
+task were `RUNNING` on worker `connect:8083` during evidence capture.
 
 Useful terminal checks:
 
