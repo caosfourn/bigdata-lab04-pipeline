@@ -147,10 +147,25 @@ The latest committed batch remained 124, the committed offset total remained
 500, pending batches remained empty, and the target document—including its
 `event_time`—was byte-for-byte unchanged in the verifier's normalized snapshot.
 
-![Live MongoDB collection and Spark restart evidence](images/mongodb-spark-live-evidence.svg)
+## Captured MongoDB and Spark evidence
 
-The left panel is the recorded MongoDB aggregation result; the right panel is
-the corresponding Spark checkpoint/restart log excerpt.
+![MongoDB Compass view of LeRobot metadata documents](images/task5-mongodb-document.png)
+
+MongoDB Compass applies the repository filter and reports 490 matching
+documents. The displayed documents contain stable `_id`/`file_id`, content
+hash, parse status, node totals and structured edge totals written by Spark.
+
+![Spark Structured Streaming progress after the replay](images/task5-spark-log.png)
+
+The real container log shows committed and latest Kafka offsets equal for all
+three `cpg.metadata` partitions, one row written through the MongoDB sink, and
+zero records of lag before the stream returns to its idle wait.
+
+![Persistent Spark checkpoint commit and offset files](images/task5-checkpoint-files.png)
+
+The host-mounted checkpoint contains matching commit and offset entries through
+batch 125. Reusing this directory is what allows the restarted query to resume
+instead of consuming unchanged offsets from the beginning.
 
 ## Reflection
 
