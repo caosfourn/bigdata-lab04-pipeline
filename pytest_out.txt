@@ -1,0 +1,10 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.7, pytest-9.1.1, pluggy-1.6.0
+rootdir: D:\HuynhHan\Bigdata\bigdata-lab04-pipeline
+configfile: pytest.ini
+plugins: anyio-4.13.0
+collected 6 items
+
+tests\test_parser_contract.py ......                                     [100%]
+
+============================== 6 passed in 0.24s ==============================

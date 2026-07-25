@@ -125,7 +125,7 @@ def discover_python_files(repo_path: str) -> list[dict]:
                 continue
 
             discovered.append({
-                "relative_path":   rel_path,
+                "relative_path":   rel_path.replace("\\", "/"),
                 "absolute_path":   abs_path,
                 "file_size_bytes": size,
                 "file_hash":       file_hash,
